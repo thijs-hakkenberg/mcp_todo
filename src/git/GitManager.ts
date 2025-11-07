@@ -246,6 +246,10 @@ export class GitManager {
 
   /**
    * Resolve a conflict in a file
+   * Automatically detects file type and uses appropriate resolution strategy:
+   * - task.json files: Uses resolveTaskFileConflict() for per-task LWW merge
+   * - README.md files: Uses resolveReadmeConflict() with timestamp-based selection
+   * - todos.json (legacy): Uses resolveFileConflict() for backward compatibility
    */
   async resolveConflict(filePath: string): Promise<void> {
     const fullPath = path.join(this.repoPath, filePath);
@@ -259,10 +263,55 @@ export class GitManager {
       // the local and remote versions from the conflict markers
       const remoteContent = localContent; // Placeholder
 
-      const resolvedContent = this.conflictResolver.resolveFileConflict(
-        localContent,
-        remoteContent
-      );
+      let resolvedContent: string;
+
+      // Detect file type and use appropriate resolution strategy
+      if (filePath.endsWith('/task.json')) {
+        // Directory-based: individual task file
+        resolvedContent = this.conflictResolver.resolveTaskFileConflict(
+          localContent,
+          remoteContent
+        );
+      } else if (filePath.endsWith('/README.md')) {
+        // Directory-based: README.md file (description)
+        // Extract timestamps from task.json in the same directory
+        const taskJsonPath = filePath.replace('/README.md', '/task.json');
+        const taskJsonFullPath = path.join(this.repoPath, taskJsonPath);
+
+        try {
+          const taskContent = await fs.readFile(taskJsonFullPath, 'utf-8');
+          const task = JSON.parse(taskContent);
+          const localModifiedAt = task.modifiedAt;
+          const remoteModifiedAt = task.modifiedAt; // In reality, would parse remote version
+
+          resolvedContent = this.conflictResolver.resolveReadmeConflict(
+            localContent,
+            remoteContent,
+            localModifiedAt,
+            remoteModifiedAt
+          );
+        } catch {
+          // If we can't read task.json, fall back to preferring remote
+          resolvedContent = this.conflictResolver.resolveReadmeConflict(
+            localContent,
+            remoteContent,
+            undefined,
+            new Date().toISOString()
+          );
+        }
+      } else if (filePath === 'todos.json') {
+        // Legacy monolithic format
+        resolvedContent = this.conflictResolver.resolveFileConflict(
+          localContent,
+          remoteContent
+        );
+      } else {
+        // Unknown file type - use legacy method as fallback
+        resolvedContent = this.conflictResolver.resolveFileConflict(
+          localContent,
+          remoteContent
+        );
+      }
 
       await this.writeFileAtomic(fullPath, resolvedContent);
     } catch (error) {

@@ -441,6 +441,179 @@ describe('ConflictResolver', () => {
     });
   });
 
+  describe('directory-based conflict resolution', () => {
+    it('should resolve individual task file conflicts', () => {
+      const localTask = {
+        id: uuidv7(),
+        text: 'Local text',
+        description: 'Local description',
+        status: 'in-progress',
+        priority: 'high',
+        project: 'work',
+        tags: ['local'],
+        createdBy: 'user-123',
+        createdAt: new Date('2024-01-01T10:00:00Z').toISOString(),
+        modifiedAt: new Date('2024-01-01T10:02:00Z').toISOString(),
+        dependencies: [],
+        subtasks: [],
+        comments: [],
+        fieldTimestamps: {
+          text: new Date('2024-01-01T10:02:00Z').toISOString(),
+          status: new Date('2024-01-01T10:02:00Z').toISOString(),
+          priority: new Date('2024-01-01T10:00:00Z').toISOString(),
+          project: new Date('2024-01-01T10:00:00Z').toISOString(),
+          tags: new Date('2024-01-01T10:00:00Z').toISOString(),
+          description: new Date('2024-01-01T10:00:00Z').toISOString(),
+          dependencies: new Date('2024-01-01T10:00:00Z').toISOString(),
+          subtasks: new Date('2024-01-01T10:00:00Z').toISOString(),
+          comments: new Date('2024-01-01T10:00:00Z').toISOString()
+        }
+      };
+
+      const remoteTask = {
+        ...localTask,
+        text: 'Remote text', // Older
+        priority: 'urgent', // Newer
+        tags: ['remote'],
+        modifiedAt: new Date('2024-01-01T10:03:00Z').toISOString(),
+        fieldTimestamps: {
+          ...localTask.fieldTimestamps,
+          text: new Date('2024-01-01T10:01:00Z').toISOString(), // Older
+          priority: new Date('2024-01-01T10:03:00Z').toISOString() // Newer
+        }
+      };
+
+      const localContent = JSON.stringify(localTask, null, 2);
+      const remoteContent = JSON.stringify(remoteTask, null, 2);
+
+      const mergedContent = resolver.resolveTaskFileConflict(localContent, remoteContent);
+      const merged = JSON.parse(mergedContent);
+
+      expect(merged.text).toBe('Local text'); // Local is newer
+      expect(merged.priority).toBe('urgent'); // Remote is newer
+      expect(merged.status).toBe('in-progress'); // Same timestamp, local wins
+    });
+
+    it('should handle corrupt task.json gracefully', () => {
+      const validTask = {
+        id: uuidv7(),
+        text: 'Valid task',
+        status: 'todo',
+        priority: 'medium',
+        project: 'work',
+        tags: [],
+        createdBy: 'user-123',
+        createdAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        dependencies: [],
+        subtasks: [],
+        comments: [],
+        fieldTimestamps: {
+          text: new Date().toISOString(),
+          status: new Date().toISOString(),
+          priority: new Date().toISOString(),
+          project: new Date().toISOString(),
+          tags: new Date().toISOString(),
+          dependencies: new Date().toISOString(),
+          subtasks: new Date().toISOString(),
+          comments: new Date().toISOString()
+        }
+      };
+
+      const localContent = JSON.stringify(validTask, null, 2);
+      const remoteContent = '{ invalid json }';
+
+      const merged = resolver.resolveTaskFileConflict(localContent, remoteContent);
+
+      // Should return valid local content when remote is corrupt
+      expect(() => JSON.parse(merged)).not.toThrow();
+      const parsed = JSON.parse(merged);
+      expect(parsed.text).toBe('Valid task');
+    });
+
+    it('should resolve README.md conflicts using modifiedAt timestamp', () => {
+      const localReadme = 'Local detailed description\nWith multiple lines';
+      const remoteReadme = 'Remote detailed description\nWith different content';
+
+      const localModifiedAt = new Date('2024-01-01T10:02:00Z').toISOString();
+      const remoteModifiedAt = new Date('2024-01-01T10:01:00Z').toISOString();
+
+      const merged = resolver.resolveReadmeConflict(
+        localReadme,
+        remoteReadme,
+        localModifiedAt,
+        remoteModifiedAt
+      );
+
+      expect(merged).toBe(localReadme); // Local is newer
+    });
+
+    it('should prefer remote README when remote is newer', () => {
+      const localReadme = 'Local description';
+      const remoteReadme = 'Remote description';
+
+      const localModifiedAt = new Date('2024-01-01T10:01:00Z').toISOString();
+      const remoteModifiedAt = new Date('2024-01-01T10:02:00Z').toISOString();
+
+      const merged = resolver.resolveReadmeConflict(
+        localReadme,
+        remoteReadme,
+        localModifiedAt,
+        remoteModifiedAt
+      );
+
+      expect(merged).toBe(remoteReadme); // Remote is newer
+    });
+
+    it('should handle missing README timestamps gracefully', () => {
+      const localReadme = 'Local description';
+      const remoteReadme = 'Remote description';
+
+      // Missing timestamps - should prefer remote by default
+      const merged = resolver.resolveReadmeConflict(
+        localReadme,
+        remoteReadme,
+        undefined,
+        new Date().toISOString()
+      );
+
+      expect(merged).toBe(remoteReadme);
+    });
+
+    it('should handle task deletion in directory-based merge', () => {
+      const taskId = uuidv7();
+      const localTask = {
+        id: taskId,
+        text: 'Local task',
+        status: 'todo',
+        priority: 'medium',
+        project: 'work',
+        tags: [],
+        createdBy: 'user-123',
+        createdAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        dependencies: [],
+        subtasks: [],
+        comments: [],
+        fieldTimestamps: {
+          text: new Date().toISOString(),
+          status: new Date().toISOString(),
+          priority: new Date().toISOString(),
+          project: new Date().toISOString(),
+          tags: new Date().toISOString(),
+          dependencies: new Date().toISOString(),
+          subtasks: new Date().toISOString(),
+          comments: new Date().toISOString()
+        }
+      };
+
+      // Remote is null (task deleted)
+      const merged = resolver.mergeTodo(localTask as Todo, null);
+
+      expect(merged).toBeNull(); // Deletion should win
+    });
+  });
+
   describe('mergeTodos (batch merge)', () => {
     it('should merge multiple todos correctly', () => {
       const todo1 = {

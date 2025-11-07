@@ -178,7 +178,96 @@ export class ConflictResolver {
   }
 
   /**
-   * Resolves conflicts in a todos.json file content
+   * Resolves conflicts in an individual task.json file
+   * Used for directory-based persistence where each task is stored in its own file.
+   *
+   * @param localContent - Local task.json content (JSON string)
+   * @param remoteContent - Remote task.json content (JSON string)
+   * @returns Merged content as JSON string
+   *
+   * @example
+   * ```typescript
+   * const merged = resolver.resolveTaskFileConflict(
+   *   fs.readFileSync('tasks/abc123/task.json', 'utf-8'),
+   *   fs.readFileSync('tasks/abc123/task.json.remote', 'utf-8')
+   * );
+   * fs.writeFileSync('tasks/abc123/task.json', merged);
+   * ```
+   */
+  resolveTaskFileConflict(localContent: string, remoteContent: string): string {
+    try {
+      const localTask = JSON.parse(localContent);
+      const remoteTask = JSON.parse(remoteContent);
+
+      const mergedTask = this.mergeTodo(localTask, remoteTask);
+
+      if (!mergedTask) {
+        // Task was deleted, return empty object or throw
+        return JSON.stringify({}, null, 2);
+      }
+
+      return JSON.stringify(mergedTask, null, 2);
+    } catch (error) {
+      // If parsing fails, prefer local content
+      console.error('Failed to parse task JSON during conflict resolution:', error);
+      return localContent;
+    }
+  }
+
+  /**
+   * Resolves conflicts in README.md files using Last-Write-Wins strategy
+   * Used when task descriptions are stored in separate README.md files.
+   *
+   * @param localContent - Local README.md content
+   * @param remoteContent - Remote README.md content
+   * @param localModifiedAt - Local task's modifiedAt timestamp (ISO8601)
+   * @param remoteModifiedAt - Remote task's modifiedAt timestamp (ISO8601)
+   * @returns Merged content (the one with newer timestamp)
+   *
+   * @example
+   * ```typescript
+   * const merged = resolver.resolveReadmeConflict(
+   *   fs.readFileSync('tasks/abc123/README.md', 'utf-8'),
+   *   fs.readFileSync('tasks/abc123/README.md.remote', 'utf-8'),
+   *   localTask.modifiedAt,
+   *   remoteTask.modifiedAt
+   * );
+   * ```
+   */
+  resolveReadmeConflict(
+    localContent: string,
+    remoteContent: string,
+    localModifiedAt?: string,
+    remoteModifiedAt?: string
+  ): string {
+    // If either timestamp is missing, prefer the one with a timestamp
+    if (!localModifiedAt && remoteModifiedAt) {
+      return remoteContent;
+    }
+    if (localModifiedAt && !remoteModifiedAt) {
+      return localContent;
+    }
+    if (!localModifiedAt && !remoteModifiedAt) {
+      // Both missing, prefer remote (conservative approach)
+      return remoteContent;
+    }
+
+    // Compare timestamps - use the newer one
+    try {
+      const localDate = new Date(localModifiedAt!);
+      const remoteDate = new Date(remoteModifiedAt!);
+
+      return remoteDate > localDate ? remoteContent : localContent;
+    } catch (error) {
+      // If timestamp parsing fails, prefer remote
+      console.error('Failed to parse timestamps during README conflict resolution:', error);
+      return remoteContent;
+    }
+  }
+
+  /**
+   * Resolves conflicts in a todos.json file content (legacy monolithic format)
+   * @deprecated Use resolveTaskFileConflict for directory-based persistence
    * @param localContent - Local file content
    * @param remoteContent - Remote file content
    * @returns Merged content as string

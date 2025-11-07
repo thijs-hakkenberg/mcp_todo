@@ -141,19 +141,16 @@ export class SyncManager {
 
   /**
    * Resolve conflicts in the specified files
+   * Handles both legacy (todos.json) and directory-based (todos/tasks/{id}/task.json) formats
    */
   async resolveConflicts(conflictedFiles: string[]): Promise<string[]> {
     const resolved: string[] = [];
 
     for (const file of conflictedFiles) {
-      if (file === 'todos.json') {
-        await this.gitManager.resolveConflict(file);
-        resolved.push(file);
-      } else {
-        // For other files, use default resolution
-        await this.gitManager.resolveConflict(file);
-        resolved.push(file);
-      }
+      // GitManager.resolveConflict() now handles file type detection
+      // and calls the appropriate ConflictResolver method
+      await this.gitManager.resolveConflict(file);
+      resolved.push(file);
     }
 
     return resolved;

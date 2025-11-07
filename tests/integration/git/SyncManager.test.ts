@@ -68,7 +68,7 @@ describe('SyncManager', () => {
       expect(mockTodoRepo.reload).toHaveBeenCalled();
     });
 
-    it('should resolve conflicts using LWW', async () => {
+    it('should resolve conflicts using LWW (legacy todos.json)', async () => {
       mockGitManager.pull.mockResolvedValue({
         success: false,
         hasConflicts: true,
@@ -88,6 +88,57 @@ describe('SyncManager', () => {
       expect(mockGitManager.commit).toHaveBeenCalledWith(
         expect.stringContaining('Resolved merge conflicts')
       );
+    });
+
+    it('should resolve conflicts in directory-based structure (task.json)', async () => {
+      mockGitManager.pull.mockResolvedValue({
+        success: false,
+        hasConflicts: true,
+        conflictedFiles: [
+          'todos/tasks/abc123/task.json',
+          'todos/tasks/def456/task.json'
+        ]
+      });
+
+      mockGitManager.resolveConflict.mockResolvedValue(undefined);
+      mockGitManager.commit.mockResolvedValue({ success: true });
+      mockGitManager.push.mockResolvedValue({ success: true });
+
+      const result = await syncManager.sync();
+
+      expect(result.success).toBe(true);
+      expect(result.hasConflicts).toBe(true);
+      expect(result.resolvedConflicts).toContain('todos/tasks/abc123/task.json');
+      expect(result.resolvedConflicts).toContain('todos/tasks/def456/task.json');
+      expect(mockGitManager.resolveConflict).toHaveBeenCalledWith('todos/tasks/abc123/task.json');
+      expect(mockGitManager.resolveConflict).toHaveBeenCalledWith('todos/tasks/def456/task.json');
+      expect(mockGitManager.commit).toHaveBeenCalledWith(
+        expect.stringContaining('Resolved merge conflicts')
+      );
+    });
+
+    it('should resolve conflicts in README.md files', async () => {
+      mockGitManager.pull.mockResolvedValue({
+        success: false,
+        hasConflicts: true,
+        conflictedFiles: [
+          'todos/tasks/abc123/task.json',
+          'todos/tasks/abc123/README.md'
+        ]
+      });
+
+      mockGitManager.resolveConflict.mockResolvedValue(undefined);
+      mockGitManager.commit.mockResolvedValue({ success: true });
+      mockGitManager.push.mockResolvedValue({ success: true });
+
+      const result = await syncManager.sync();
+
+      expect(result.success).toBe(true);
+      expect(result.hasConflicts).toBe(true);
+      expect(result.resolvedConflicts).toContain('todos/tasks/abc123/task.json');
+      expect(result.resolvedConflicts).toContain('todos/tasks/abc123/README.md');
+      expect(mockGitManager.resolveConflict).toHaveBeenCalledWith('todos/tasks/abc123/task.json');
+      expect(mockGitManager.resolveConflict).toHaveBeenCalledWith('todos/tasks/abc123/README.md');
     });
 
     it('should retry on push failure', async () => {
