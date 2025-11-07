@@ -4,6 +4,7 @@
   import type { Todo } from '../types/Todo';
   import FilterBar from './FilterBar.svelte';
   import KanbanColumn from './KanbanColumn.svelte';
+  import ProjectAutocomplete from './ProjectAutocomplete.svelte';
 
   let { allowColumnReorder = false, readOnly = false } = $props<{
     allowColumnReorder?: boolean;
@@ -16,6 +17,8 @@
   let editingTodo = $state<Todo | null>(null);
   let addModalStatus = $state<Todo['status']>('todo');
   let isSubmitting = $state(false);
+  let addModalProject = $state('');
+  let editModalProject = $state('');
 
   onMount(() => {
     console.log('[KanbanBoard] onMount - calling loadTodos');
@@ -47,6 +50,7 @@
   function handleAddTodo(status: Todo['status']) {
     if (!readOnly) {
       addModalStatus = status;
+      addModalProject = '';
       showAddModal = true;
     }
   }
@@ -60,6 +64,7 @@
 
   function handleEditTodo(todo: Todo) {
     editingTodo = todo;
+    editModalProject = todo.project;
     showEditModal = true;
     selectedTodo = null; // Close detail modal
   }
@@ -266,7 +271,7 @@
                 description: formData.get('description') as string || undefined,
                 status: addModalStatus,
                 priority: formData.get('priority') as Todo['priority'],
-                project: formData.get('project') as string,
+                project: addModalProject,
                 tags: (formData.get('tags') as string || '').split(',').map(t => t.trim()).filter(Boolean),
                 assignee: formData.get('assignee') as string || undefined
               });
@@ -313,12 +318,7 @@
 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
-                  <input
-                    type="text"
-                    name="project"
-                    required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <ProjectAutocomplete bind:value={addModalProject} required />
                 </div>
               </div>
 
@@ -382,7 +382,7 @@
                 description: formData.get('description') as string || undefined,
                 status: formData.get('status') as Todo['status'],
                 priority: formData.get('priority') as Todo['priority'],
-                project: formData.get('project') as string,
+                project: editModalProject,
                 tags: (formData.get('tags') as string || '').split(',').map(t => t.trim()).filter(Boolean),
                 assignee: formData.get('assignee') as string || undefined
               });
@@ -447,13 +447,7 @@
 
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Project *</label>
-                <input
-                  type="text"
-                  name="project"
-                  required
-                  value={editingTodo.project}
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <ProjectAutocomplete bind:value={editModalProject} required />
               </div>
 
               <div>

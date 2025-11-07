@@ -91,7 +91,7 @@ describe('Todo Routes', () => {
 
       expect(mockMCPClient.callTool).toHaveBeenCalledWith('list_todos', {
         sortBy: 'priority',
-        limit: '10' // Note: query params are strings
+        limit: 10 // Converted from string to number
       });
     });
   });

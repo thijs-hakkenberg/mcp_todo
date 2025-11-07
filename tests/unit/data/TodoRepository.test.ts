@@ -1,5 +1,7 @@
 import { TodoRepository } from '../../../src/data/TodoRepository';
 import { GitManager } from '../../../src/git/GitManager';
+import { DirectoryManager } from '../../../src/data/DirectoryManager';
+import { SymlinkManager } from '../../../src/data/SymlinkManager';
 import { Todo, createTodo } from '../../../src/types/Todo';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -7,17 +9,25 @@ import { uuidv7 } from 'uuidv7';
 
 // Mock dependencies
 jest.mock('../../../src/git/GitManager');
+jest.mock('../../../src/data/DirectoryManager');
+jest.mock('../../../src/data/SymlinkManager');
 jest.mock('fs/promises');
 
 describe('TodoRepository', () => {
   let repo: TodoRepository;
   let mockGitManager: jest.Mocked<GitManager>;
+  let mockDirectoryManager: jest.Mocked<DirectoryManager>;
+  let mockSymlinkManager: jest.Mocked<SymlinkManager>;
   const testRepoPath = '/test/repo/path';
   const todosFilePath = path.join(testRepoPath, 'todos.json');
+
+  // Store for in-memory todos (simulates directory structure)
+  let storedTodos: Map<string, Todo> = new Map();
 
   beforeEach(async () => {
     // Reset mocks
     jest.clearAllMocks();
+    storedTodos.clear();
 
     // Create mock GitManager
     mockGitManager = {
@@ -26,10 +36,51 @@ describe('TodoRepository', () => {
       syncWithRetry: jest.fn().mockResolvedValue({ success: true })
     } as any;
 
-    // Mock fs functions
+    // Mock DirectoryManager
+    mockDirectoryManager = {
+      ensureDirectoryStructure: jest.fn().mockResolvedValue(undefined),
+      listAllTasks: jest.fn().mockImplementation(async () => {
+        return Array.from(storedTodos.keys());
+      }),
+      readTask: jest.fn().mockImplementation(async (id: string) => {
+        const todo = storedTodos.get(id);
+        if (!todo) {
+          throw new Error('Task not found');
+        }
+        return todo;
+      }),
+      writeTask: jest.fn().mockImplementation(async (todo: Todo) => {
+        storedTodos.set(todo.id, todo);
+      }),
+      deleteTask: jest.fn().mockImplementation(async (id: string) => {
+        storedTodos.delete(id);
+      }),
+      taskExists: jest.fn().mockImplementation(async (id: string) => {
+        return storedTodos.has(id);
+      })
+    } as any;
+
+    // Mock SymlinkManager
+    mockSymlinkManager = {
+      updateSymlinks: jest.fn().mockResolvedValue(undefined),
+      updateSymlinksWithOldTask: jest.fn().mockResolvedValue(undefined),
+      removeSymlinks: jest.fn().mockResolvedValue(undefined),
+      rebuildAllSymlinks: jest.fn().mockResolvedValue(undefined)
+    } as any;
+
+    // Mock fs functions (for migration tests)
     (fs.readFile as jest.Mock).mockResolvedValue(JSON.stringify({ todos: [] }));
-    (fs.access as jest.Mock).mockResolvedValue(undefined);
+    (fs.access as jest.Mock).mockRejectedValue({ code: 'ENOENT' }); // No legacy format by default
     (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+    (fs.copyFile as jest.Mock).mockResolvedValue(undefined);
+    (fs.unlink as jest.Mock).mockResolvedValue(undefined);
+    (fs.symlink as jest.Mock).mockResolvedValue(undefined);
+    (fs.readdir as jest.Mock).mockResolvedValue([]);
+    (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true } as any);
+
+    // Mock DirectoryManager and SymlinkManager constructors
+    (DirectoryManager as jest.MockedClass<typeof DirectoryManager>).mockImplementation(() => mockDirectoryManager);
+    (SymlinkManager as jest.MockedClass<typeof SymlinkManager>).mockImplementation(() => mockSymlinkManager);
 
     // Create repository instance and initialize
     repo = new TodoRepository(testRepoPath, mockGitManager);
@@ -93,7 +144,7 @@ describe('TodoRepository', () => {
       await expect(repo.create(invalidInput)).rejects.toThrow();
     });
 
-    it('should persist to todos.json', async () => {
+    it('should persist to directory structure', async () => {
       const input = {
         text: 'Test todo',
         project: 'work',
@@ -102,9 +153,18 @@ describe('TodoRepository', () => {
 
       const todo = await repo.create(input);
 
-      expect(mockGitManager.writeFileAtomic).toHaveBeenCalledWith(
-        todosFilePath,
-        expect.stringContaining(todo.id)
+      // Verify DirectoryManager.writeTask was called
+      expect(mockDirectoryManager.writeTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: todo.id,
+          text: 'Test todo',
+          project: 'work'
+        })
+      );
+
+      // Verify SymlinkManager.updateSymlinks was called
+      expect(mockSymlinkManager.updateSymlinks).toHaveBeenCalledWith(
+        expect.objectContaining({ id: todo.id })
       );
     });
   });
@@ -123,10 +183,10 @@ describe('TodoRepository', () => {
         createdBy: 'user-123'
       });
 
-      // Re-initialize repo with existing todo
-      (fs.readFile as jest.Mock).mockResolvedValue(
-        JSON.stringify({ todos: [existingTodo] })
-      );
+      // Add existing todo to stored todos (simulates it being in directory)
+      storedTodos.set(existingTodo.id, existingTodo);
+
+      // Reload to populate in-memory cache
       await repo.reload();
     });
 
@@ -227,10 +287,10 @@ describe('TodoRepository', () => {
         })
       ];
 
-      // Re-initialize repo with todos
-      (fs.readFile as jest.Mock).mockResolvedValue(
-        JSON.stringify({ todos })
-      );
+      // Add todos to stored todos (simulates them being in directory)
+      todos.forEach(todo => storedTodos.set(todo.id, todo));
+
+      // Reload to populate in-memory cache
       await repo.reload();
     });
 
@@ -286,10 +346,8 @@ describe('TodoRepository', () => {
         createdBy: 'user-456'
       });
 
-      todos.push(urgentTodo);
-      (fs.readFile as jest.Mock).mockResolvedValue(
-        JSON.stringify({ todos })
-      );
+      // Add urgent todo to stored todos
+      storedTodos.set(urgentTodo.id, urgentTodo);
       await repo.reload();
 
       const result = await repo.list({ sortBy: 'priority', sortOrder: 'desc' });
@@ -321,21 +379,24 @@ describe('TodoRepository', () => {
         createdBy: 'user-123'
       });
 
-      (fs.readFile as jest.Mock).mockResolvedValue(
-        JSON.stringify({ todos: [existingTodo] })
-      );
+      // Add existing todo to stored todos
+      storedTodos.set(existingTodo.id, existingTodo);
       await repo.reload();
     });
 
     it('should soft delete (archive) by default', async () => {
       await repo.delete(existingTodo.id);
 
-      // Check that todo is marked as archived
-      const writeCall = mockGitManager.writeFileAtomic.mock.calls[0];
-      const writtenData = JSON.parse(writeCall[1]);
+      // Verify DirectoryManager.writeTask was called with archived flag
+      expect(mockDirectoryManager.writeTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: existingTodo.id,
+          archived: true
+        })
+      );
 
-      const archivedTodo = writtenData.todos.find((t: any) => t.id === existingTodo.id);
-      expect(archivedTodo.archived).toBe(true);
+      // Verify SymlinkManager.removeSymlinks was called
+      expect(mockSymlinkManager.removeSymlinks).toHaveBeenCalledWith(existingTodo);
     });
 
     it('should update archived timestamp', async () => {
@@ -343,9 +404,9 @@ describe('TodoRepository', () => {
       await repo.delete(existingTodo.id);
       const after = Date.now();
 
-      const writeCall = mockGitManager.writeFileAtomic.mock.calls[0];
-      const writtenData = JSON.parse(writeCall[1]);
-      const archivedTodo = writtenData.todos.find((t: any) => t.id === existingTodo.id);
+      // Get the todo that was written
+      const writeCall = mockDirectoryManager.writeTask.mock.calls[0];
+      const archivedTodo = writeCall[0] as any; // Cast to any since it includes archived fields
 
       const archivedTime = new Date(archivedTodo.archivedAt).getTime();
       expect(archivedTime).toBeGreaterThanOrEqual(before);
@@ -377,9 +438,8 @@ describe('TodoRepository', () => {
         createdBy: 'user-123'
       });
 
-      (fs.readFile as jest.Mock).mockResolvedValue(
-        JSON.stringify({ todos: [existingTodo] })
-      );
+      // Add existing todo to stored todos
+      storedTodos.set(existingTodo.id, existingTodo);
       await repo.reload();
     });
 
@@ -398,47 +458,46 @@ describe('TodoRepository', () => {
   });
 
   describe('initialization', () => {
-    it('should create todos.json if not exists', async () => {
-      (fs.access as jest.Mock).mockRejectedValue(new Error('File not found'));
-
+    it('should create directory structure if not exists', async () => {
       await repo.initialize();
 
-      expect(mockGitManager.writeFileAtomic).toHaveBeenCalledWith(
-        todosFilePath,
-        JSON.stringify({ todos: [] }, null, 2)
-      );
+      // Verify DirectoryManager.ensureDirectoryStructure was called
+      expect(mockDirectoryManager.ensureDirectoryStructure).toHaveBeenCalled();
     });
 
-    it('should not overwrite existing todos.json', async () => {
-      (fs.access as jest.Mock).mockResolvedValue(undefined);
-
+    it('should not run migration if no legacy format', async () => {
+      // fs.access is already mocked to reject (no todos.json)
       await repo.initialize();
 
-      expect(mockGitManager.writeFileAtomic).not.toHaveBeenCalled();
+      // Verify no backup was created (migration didn't run)
+      expect(fs.copyFile).not.toHaveBeenCalled();
     });
   });
 
   describe('sync operations', () => {
     it('should reload todos after sync', async () => {
-      const originalTodos = [createTodo({
+      const originalTodo = createTodo({
         text: 'Original',
         project: 'work',
         createdBy: 'user-123'
-      })];
+      });
 
-      const newTodos = [createTodo({
+      const newTodo = createTodo({
         text: 'Updated after sync',
         project: 'work',
         createdBy: 'user-123'
-      })];
+      });
 
-      (fs.readFile as jest.Mock)
-        .mockResolvedValueOnce(JSON.stringify({ todos: originalTodos }))
-        .mockResolvedValueOnce(JSON.stringify({ todos: newTodos }));
+      // Start with original todo
+      storedTodos.set(originalTodo.id, originalTodo);
+      await repo.reload();
 
-      await repo.initialize();
       const beforeSync = await repo.list();
       expect(beforeSync[0].text).toBe('Original');
+
+      // Simulate sync - replace with new todo
+      storedTodos.clear();
+      storedTodos.set(newTodo.id, newTodo);
 
       await repo.reload();
       const afterSync = await repo.list();
@@ -474,9 +533,8 @@ describe('TodoRepository', () => {
         })
       ];
 
-      (fs.readFile as jest.Mock).mockResolvedValue(
-        JSON.stringify({ todos })
-      );
+      // Add todos to stored todos
+      todos.forEach(todo => storedTodos.set(todo.id, todo));
       await repo.reload();
     });
 
@@ -538,9 +596,8 @@ describe('TodoRepository', () => {
         })
       ];
 
-      (fs.readFile as jest.Mock).mockResolvedValue(
-        JSON.stringify({ todos })
-      );
+      // Add todos to stored todos
+      todos.forEach(todo => storedTodos.set(todo.id, todo));
       await repo.reload();
     });
 
@@ -552,9 +609,7 @@ describe('TodoRepository', () => {
       });
 
       it('should return empty array when no todos exist', async () => {
-        (fs.readFile as jest.Mock).mockResolvedValue(
-          JSON.stringify({ todos: [] })
-        );
+        storedTodos.clear();
         await repo.reload();
 
         const projects = await repo.getProjects();
@@ -563,25 +618,25 @@ describe('TodoRepository', () => {
       });
 
       it('should not include archived todos', async () => {
-        const todos = [
-          createTodo({
-            text: 'Active',
-            project: 'active-project',
+        storedTodos.clear();
+
+        const activeTodo = createTodo({
+          text: 'Active',
+          project: 'active-project',
+          createdBy: 'user-123'
+        });
+
+        const archivedTodo = {
+          ...createTodo({
+            text: 'Archived',
+            project: 'archived-project',
             createdBy: 'user-123'
           }),
-          {
-            ...createTodo({
-              text: 'Archived',
-              project: 'archived-project',
-              createdBy: 'user-123'
-            }),
-            archived: true
-          }
-        ];
+          archived: true
+        };
 
-        (fs.readFile as jest.Mock).mockResolvedValue(
-          JSON.stringify({ todos })
-        );
+        storedTodos.set(activeTodo.id, activeTodo);
+        storedTodos.set(archivedTodo.id, archivedTodo as any);
         await repo.reload();
 
         const projects = await repo.getProjects();
@@ -598,24 +653,24 @@ describe('TodoRepository', () => {
       });
 
       it('should flatten tags from multiple todos', async () => {
-        const todos = [
-          createTodo({
-            text: 'Task 1',
-            project: 'project1',
-            tags: ['a', 'b'],
-            createdBy: 'user-123'
-          }),
-          createTodo({
-            text: 'Task 2',
-            project: 'project1',
-            tags: ['b', 'c'],
-            createdBy: 'user-123'
-          })
-        ];
+        storedTodos.clear();
 
-        (fs.readFile as jest.Mock).mockResolvedValue(
-          JSON.stringify({ todos })
-        );
+        const todo1 = createTodo({
+          text: 'Task 1',
+          project: 'project1',
+          tags: ['a', 'b'],
+          createdBy: 'user-123'
+        });
+
+        const todo2 = createTodo({
+          text: 'Task 2',
+          project: 'project1',
+          tags: ['b', 'c'],
+          createdBy: 'user-123'
+        });
+
+        storedTodos.set(todo1.id, todo1);
+        storedTodos.set(todo2.id, todo2);
         await repo.reload();
 
         const tags = await repo.getTags();
@@ -624,17 +679,15 @@ describe('TodoRepository', () => {
       });
 
       it('should return empty array when no todos have tags', async () => {
-        const todos = [
-          createTodo({
-            text: 'Task without tags',
-            project: 'project1',
-            createdBy: 'user-123'
-          })
-        ];
+        storedTodos.clear();
 
-        (fs.readFile as jest.Mock).mockResolvedValue(
-          JSON.stringify({ todos })
-        );
+        const todo = createTodo({
+          text: 'Task without tags',
+          project: 'project1',
+          createdBy: 'user-123'
+        });
+
+        storedTodos.set(todo.id, todo);
         await repo.reload();
 
         const tags = await repo.getTags();
@@ -651,23 +704,23 @@ describe('TodoRepository', () => {
       });
 
       it('should not include undefined assignees', async () => {
-        const todos = [
-          createTodo({
-            text: 'Assigned task',
-            project: 'project1',
-            assignee: 'charlie',
-            createdBy: 'user-123'
-          }),
-          createTodo({
-            text: 'Unassigned task',
-            project: 'project1',
-            createdBy: 'user-123'
-          })
-        ];
+        storedTodos.clear();
 
-        (fs.readFile as jest.Mock).mockResolvedValue(
-          JSON.stringify({ todos })
-        );
+        const assignedTodo = createTodo({
+          text: 'Assigned task',
+          project: 'project1',
+          assignee: 'charlie',
+          createdBy: 'user-123'
+        });
+
+        const unassignedTodo = createTodo({
+          text: 'Unassigned task',
+          project: 'project1',
+          createdBy: 'user-123'
+        });
+
+        storedTodos.set(assignedTodo.id, assignedTodo);
+        storedTodos.set(unassignedTodo.id, unassignedTodo);
         await repo.reload();
 
         const assignees = await repo.getAssignees();
@@ -676,17 +729,15 @@ describe('TodoRepository', () => {
       });
 
       it('should return empty array when no todos are assigned', async () => {
-        const todos = [
-          createTodo({
-            text: 'Unassigned',
-            project: 'project1',
-            createdBy: 'user-123'
-          })
-        ];
+        storedTodos.clear();
 
-        (fs.readFile as jest.Mock).mockResolvedValue(
-          JSON.stringify({ todos })
-        );
+        const todo = createTodo({
+          text: 'Unassigned',
+          project: 'project1',
+          createdBy: 'user-123'
+        });
+
+        storedTodos.set(todo.id, todo);
         await repo.reload();
 
         const assignees = await repo.getAssignees();
@@ -716,9 +767,7 @@ describe('TodoRepository', () => {
       });
 
       it('should return empty arrays when no todos exist', async () => {
-        (fs.readFile as jest.Mock).mockResolvedValue(
-          JSON.stringify({ todos: [] })
-        );
+        storedTodos.clear();
         await repo.reload();
 
         const options = await repo.getFilterOptions();
@@ -729,6 +778,202 @@ describe('TodoRepository', () => {
           assignees: [],
           priorities: ['urgent', 'high', 'medium', 'low']
         });
+      });
+    });
+  });
+
+  describe('Migration from legacy format', () => {
+    describe('isLegacyFormat', () => {
+      it('should return true if todos.json exists', async () => {
+        (fs.access as jest.Mock)
+          .mockResolvedValueOnce(undefined) // todos.json exists
+          .mockRejectedValueOnce({ code: 'ENOENT' }); // todos/ does not exist
+
+        const result = await repo.isLegacyFormat();
+
+        expect(result).toBe(true);
+        expect(fs.access).toHaveBeenCalledWith(todosFilePath);
+      });
+
+      it('should return false if todos.json does not exist', async () => {
+        (fs.access as jest.Mock).mockRejectedValue({ code: 'ENOENT' });
+
+        const result = await repo.isLegacyFormat();
+
+        expect(result).toBe(false);
+      });
+
+      it('should return false if todos/ directory exists', async () => {
+        (fs.access as jest.Mock)
+          .mockResolvedValueOnce(undefined) // todos.json exists
+          .mockResolvedValueOnce(undefined); // todos/ directory exists
+
+        const result = await repo.isLegacyFormat();
+
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('migrateLegacyToDirectory', () => {
+      const mockTodos = [
+        createTodo({
+          id: '019a1234-5678-7000-8000-000000000001',
+          text: 'Task 1',
+          project: 'test-project',
+          createdBy: 'user-1'
+        }),
+        createTodo({
+          id: '019a1234-5678-7000-8000-000000000002',
+          text: 'Task 2',
+          project: 'another-project',
+          status: 'done',
+          priority: 'high',
+          tags: ['urgent', 'bug'],
+          assignee: 'user-2',
+          createdBy: 'user-2'
+        })
+      ];
+
+      beforeEach(() => {
+        (fs.readFile as jest.Mock).mockResolvedValue(
+          JSON.stringify({ todos: mockTodos })
+        );
+      });
+
+      it('should create backup of todos.json', async () => {
+        await repo.migrateLegacyToDirectory();
+
+        expect(fs.copyFile).toHaveBeenCalledWith(
+          todosFilePath,
+          `${todosFilePath}.backup`
+        );
+      });
+
+      it('should create directory structure', async () => {
+        await repo.migrateLegacyToDirectory();
+
+        // DirectoryManager.ensureDirectoryStructure should be called
+        expect(mockDirectoryManager.ensureDirectoryStructure).toHaveBeenCalled();
+      });
+
+      it('should write all todos to individual directories', async () => {
+        await repo.migrateLegacyToDirectory();
+
+        // Should call DirectoryManager.writeTask for each todo
+        expect(mockDirectoryManager.writeTask).toHaveBeenCalledTimes(2);
+        expect(mockDirectoryManager.writeTask).toHaveBeenCalledWith(
+          expect.objectContaining({ id: '019a1234-5678-7000-8000-000000000001' })
+        );
+        expect(mockDirectoryManager.writeTask).toHaveBeenCalledWith(
+          expect.objectContaining({ id: '019a1234-5678-7000-8000-000000000002' })
+        );
+      });
+
+      it('should create symlinks for all todos', async () => {
+        await repo.migrateLegacyToDirectory();
+
+        // Should call SymlinkManager.rebuildAllSymlinks with all todos
+        expect(mockSymlinkManager.rebuildAllSymlinks).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ id: '019a1234-5678-7000-8000-000000000001' }),
+            expect.objectContaining({ id: '019a1234-5678-7000-8000-000000000002' })
+          ])
+        );
+      });
+
+      it('should remove todos.json after successful migration', async () => {
+        await repo.migrateLegacyToDirectory();
+
+        expect(fs.unlink).toHaveBeenCalledWith(todosFilePath);
+      });
+
+      it('should commit migration', async () => {
+        await repo.migrateLegacyToDirectory();
+
+        expect(mockGitManager.commit).toHaveBeenCalledWith(
+          expect.stringContaining('migrate')
+        );
+      });
+
+      it('should handle empty todos.json', async () => {
+        (fs.readFile as jest.Mock).mockResolvedValue(
+          JSON.stringify({ todos: [] })
+        );
+
+        await expect(repo.migrateLegacyToDirectory()).resolves.not.toThrow();
+      });
+
+      it('should handle todos with special characters in project names', async () => {
+        const todosWithSpecialChars = [
+          createTodo({
+            id: '019a1234-5678-7000-8000-000000000001',
+            text: 'Task 1',
+            project: 'My Project Name',
+            createdBy: 'user-1'
+          }),
+          createTodo({
+            id: '019a1234-5678-7000-8000-000000000002',
+            text: 'Task 2',
+            project: 'project/with/slashes',
+            createdBy: 'user-2'
+          })
+        ];
+
+        (fs.readFile as jest.Mock).mockResolvedValue(
+          JSON.stringify({ todos: todosWithSpecialChars })
+        );
+
+        await expect(repo.migrateLegacyToDirectory()).resolves.not.toThrow();
+      });
+
+      it('should handle todos without optional fields', async () => {
+        const minimalTodos = [
+          createTodo({
+            id: '019a1234-5678-7000-8000-000000000001',
+            text: 'Minimal task',
+            project: 'test',
+            createdBy: 'user-1'
+          })
+        ];
+
+        (fs.readFile as jest.Mock).mockResolvedValue(
+          JSON.stringify({ todos: minimalTodos })
+        );
+
+        await expect(repo.migrateLegacyToDirectory()).resolves.not.toThrow();
+      });
+
+      it('should rollback on migration failure', async () => {
+        // Make DirectoryManager.ensureDirectoryStructure fail
+        mockDirectoryManager.ensureDirectoryStructure.mockRejectedValueOnce(new Error('Disk full'));
+
+        await expect(repo.migrateLegacyToDirectory()).rejects.toThrow();
+
+        // Should not remove todos.json on failure
+        expect(fs.unlink).not.toHaveBeenCalledWith(todosFilePath);
+      });
+
+      it('should preserve todo data integrity during migration', async () => {
+        await repo.migrateLegacyToDirectory();
+
+        // Verify written data matches original
+        const writeCalls = mockDirectoryManager.writeTask.mock.calls;
+        const task1Call = writeCalls.find(call =>
+          call[0].id === '019a1234-5678-7000-8000-000000000001'
+        );
+        const task2Call = writeCalls.find(call =>
+          call[0].id === '019a1234-5678-7000-8000-000000000002'
+        );
+
+        expect(task1Call).toBeDefined();
+        expect(task2Call).toBeDefined();
+
+        const task1Data = task1Call![0];
+        const task2Data = task2Call![0];
+
+        expect(task1Data.text).toBe('Task 1');
+        expect(task2Data.text).toBe('Task 2');
+        expect(task2Data.tags).toEqual(['urgent', 'bug']);
       });
     });
   });

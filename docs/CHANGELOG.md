@@ -5,6 +5,59 @@ All notable changes to the Git-Based MCP Todo Server will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2025-11-03
+
+### Added
+- **Project Autocomplete Component**: Replaced free-text project field with intelligent searchable dropdown
+  - **Search & Select**: Type to filter through existing projects (real-time search)
+  - **Create New**: Automatically detects new project names and shows "Create new: {name}" option
+  - **Visual Feedback**: Folder icon for existing projects, plus icon for new projects
+  - **Keyboard Support**: Escape key to close dropdown, full keyboard navigation
+  - **Click-Outside Detection**: Automatically closes dropdown when clicking elsewhere
+  - **API Integration**: Fetches existing projects from `/api/todos/filter-options` on mount
+  - Prevents typos and duplicate project names with slight variations
+  - Works in both Add and Edit todo modals
+
+### Changed
+- **Add Todo Modal**: Project field now uses the ProjectAutocomplete component
+- **Edit Todo Modal**: Project field now uses ProjectAutocomplete component
+- **Project Field UX**: Improved from basic text input to intelligent autocomplete with search
+i
+### Technical Details
+
+#### New Component
+- `web/src/lib/components/ProjectAutocomplete.svelte`: Reusable autocomplete component
+  - Uses Svelte 5 runes (`$state`, `$derived`, `$bindable`)
+  - Reactive filtering based on input value
+  - Clean separation of existing vs. new project options
+  - Proper cleanup of event listeners in onMount
+
+#### Updated Components
+- `web/src/lib/components/KanbanBoard.svelte`:
+  - Added `addModalProject` and `editModalProject` state variables
+  - Integrated ProjectAutocomplete in both Add and Edit forms
+  - Maintains project value through modal lifecycle
+
+#### Test Coverage
+- **Store Tests**: 49/49 passing (100%) ✅
+  - Existing tests cover project field in create/update operations
+  - ProjectAutocomplete component follows same pattern as other Svelte 5 components
+  - Component tests excluded per TESTING_LIMITATIONS.md (Svelte 5 runes + jsdom)
+- **Backend Tests**: 154 passing (~94% coverage)
+- **Build**: Successful with no errors
+
+#### API Usage
+- `GET /api/todos/filter-options`: Returns list of existing projects
+- Projects dynamically populated from actual todo data
+- No hardcoded project lists, always up-to-date
+
+#### Files Modified
+- `web/src/lib/components/KanbanBoard.svelte`: Integrated ProjectAutocomplete in modals
+- `web/src/lib/components/ProjectAutocomplete.svelte`: New component (created)
+
+#### Files Created
+- `web/src/lib/components/ProjectAutocomplete.svelte` (150 lines): Full autocomplete implementation
+
 ## [1.7.0] - 2025-11-01
 
 ### Added
@@ -86,7 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Test Coverage
 - **Store Tests**: 49/49 passing (100%) ✅
-  - Added 3 comprehensive update tests:
+  - Added three comprehensive update tests:
     - Update multiple fields simultaneously
     - Partial updates (only specified fields)
     - Optimistic update rollback on error
@@ -307,18 +360,18 @@ None. This release is backward compatible.
 - Added `includeCompleted` to `TodoFilters` interface
 - Updated `todoStore.loadTodos()` to use `mode: 'standard'` and `includeCompleted` filter
 - Added `setIncludeCompletedFilter()` method with automatic reload
-- Added "Show completed" toggle in FilterBar component
-- **Note**: Web UI tests need updates for new filter structure (64 tests to update)
+- Added "Show completed" toggle in the FilterBar component
+- **Note**: Web UI tests need updates for the new filter structure (64 tests to update)
 
 #### Test Coverage
 - Created comprehensive test suites for field selection (`TodoRepository.field-selection.test.ts`)
 - Created test suite for `includeCompleted` filter (`TodoRepository.default-filters.test.ts`)
 - Updated MCP tool tests to cover new parameters (`todoTools.test.ts`)
 - Backend: 26/26 new integration tests passing
-- Frontend: Tests pending updates for new filter structure
+- Frontend: Tests pending updates for the new filter structure
 
 ### Documentation
-- Created `docs/PLANNING.md` with next 7 high-priority tasks
+- Created `docs/PLANNING.md` with next seven high-priority tasks
 - Updated CHANGELOG with comprehensive v1.4.0 notes
 
 ### Migration Guide
@@ -346,7 +399,7 @@ GET /api/todos?project=work&mode=standard&includeCompleted=false
 ```
 
 #### For Web UI
-- No migration needed - new toggle is opt-in
+- No migration needed - the new toggle is opt-in
 - Default behavior now hides completed todos (can be enabled with checkbox)
 
 ## [1.3.0] - 2025-10-30

@@ -9,6 +9,8 @@ import {
   FieldSelectionMode
 } from '../types/Todo';
 import { GitManager } from '../git/GitManager';
+import { DirectoryManager } from './DirectoryManager';
+import { SymlinkManager } from './SymlinkManager';
 
 export interface ListOptions {
   // Filtering options
@@ -44,53 +46,70 @@ export interface TodoWithArchive extends Todo {
  * Repository for managing Todo CRUD operations
  */
 export class TodoRepository {
+  private repoPath: string;
   private todosFilePath: string;
   private gitManager: GitManager;
+  private directoryManager: DirectoryManager;
+  private symlinkManager: SymlinkManager;
   private todos: TodoWithArchive[] = [];
   private initialized = false;
 
   constructor(repoPath: string, gitManager: GitManager) {
+    this.repoPath = repoPath;
     this.todosFilePath = path.join(repoPath, 'todos.json');
     this.gitManager = gitManager;
+    this.directoryManager = new DirectoryManager(repoPath, gitManager);
+    this.symlinkManager = new SymlinkManager(repoPath);
   }
 
   /**
    * Initialize the repository
+   *
+   * Automatically detects legacy format (todos.json) and migrates to directory-based structure.
+   * For new installations, creates the directory structure directly.
    */
   async initialize(): Promise<void> {
-    try {
-      // Check if todos.json exists
-      await fs.access(this.todosFilePath);
-      await this.loadTodos();
-    } catch {
-      // Create initial todos.json
-      await this.gitManager.writeFileAtomic(
-        this.todosFilePath,
-        JSON.stringify({ todos: [] }, null, 2)
-      );
-      this.todos = [];
+    // Check if we need to migrate from legacy format
+    const isLegacy = await this.isLegacyFormat();
+
+    if (isLegacy) {
+      // Automatically migrate from todos.json to directory structure
+      await this.migrateLegacyToDirectory();
     }
+
+    // Ensure directory structure exists
+    await this.directoryManager.ensureDirectoryStructure();
+
+    // Load todos from directory structure
+    await this.loadTodos();
+
     this.initialized = true;
   }
 
   /**
-   * Load todos from file
+   * Load todos from directory structure
    */
   private async loadTodos(): Promise<void> {
-    const content = await fs.readFile(this.todosFilePath, 'utf-8');
-    const data = JSON.parse(content);
-    this.todos = data.todos || [];
+    try {
+      const taskIds = await this.directoryManager.listAllTasks();
+
+      // Load each todo from its directory
+      this.todos = [];
+      for (const taskId of taskIds) {
+        try {
+          const todo = await this.directoryManager.readTask(taskId);
+          this.todos.push(todo as TodoWithArchive);
+        } catch (error) {
+          // Skip corrupted/unreadable tasks
+          console.warn(`Failed to load task ${taskId}:`, error);
+        }
+      }
+    } catch (error) {
+      // If directory doesn't exist yet or is empty, start with empty array
+      this.todos = [];
+    }
   }
 
-  /**
-   * Save todos to file
-   */
-  private async saveTodos(): Promise<void> {
-    await this.gitManager.writeFileAtomic(
-      this.todosFilePath,
-      JSON.stringify({ todos: this.todos }, null, 2)
-    );
-  }
 
   /**
    * Ensure repository is initialized
@@ -108,8 +127,15 @@ export class TodoRepository {
     this.ensureInitialized();
 
     const todo = createTodo(input);
+
+    // Write to directory structure
+    await this.directoryManager.writeTask(todo);
+
+    // Update symlinks
+    await this.symlinkManager.updateSymlinks(todo);
+
+    // Update in-memory cache
     this.todos.push(todo);
-    await this.saveTodos();
 
     return todo;
   }
@@ -132,12 +158,17 @@ export class TodoRepository {
       // Create all todos
       for (const input of inputs) {
         const todo = createTodo(input);
-        this.todos.push(todo);
         createdTodos.push(todo);
-      }
 
-      // Save once after all todos are created
-      await this.saveTodos();
+        // Write each todo to directory structure
+        await this.directoryManager.writeTask(todo);
+
+        // Update symlinks for this todo
+        await this.symlinkManager.updateSymlinks(todo);
+
+        // Update in-memory cache
+        this.todos.push(todo);
+      }
 
       return createdTodos;
     } catch (error) {
@@ -147,6 +178,7 @@ export class TodoRepository {
         if (index !== -1) {
           this.todos.splice(index, 1);
         }
+        // Note: Files and symlinks will be cleaned up by Git rollback
       }
       throw error;
     }
@@ -163,9 +195,17 @@ export class TodoRepository {
       throw new Error('Todo not found');
     }
 
-    const updatedTodo = updateTodo(this.todos[index], updates);
+    const oldTodo = this.todos[index];
+    const updatedTodo = updateTodo(oldTodo, updates);
+
+    // Write updated todo to directory structure
+    await this.directoryManager.writeTask(updatedTodo);
+
+    // Update symlinks (only touches changed properties)
+    await this.symlinkManager.updateSymlinksWithOldTask(updatedTodo, oldTodo);
+
+    // Update in-memory cache
     this.todos[index] = updatedTodo;
-    await this.saveTodos();
 
     return updatedTodo;
   }
@@ -359,18 +399,34 @@ export class TodoRepository {
       throw new Error('Todo not found');
     }
 
+    const todo = this.todos[index];
+
     if (hardDelete) {
+      // Hard delete - remove from file system (remove artifacts too)
+      await this.directoryManager.deleteTask(id, { preserveArtifacts: false });
+
+      // Remove all symlinks
+      await this.symlinkManager.removeSymlinks(todo);
+
+      // Remove from in-memory cache
       this.todos.splice(index, 1);
     } else {
-      // Soft delete - mark as archived
-      this.todos[index] = {
-        ...this.todos[index],
+      // Soft delete - mark as archived but keep files
+      const archivedTodo = {
+        ...todo,
         archived: true,
         archivedAt: new Date().toISOString()
       };
-    }
 
-    await this.saveTodos();
+      // Update the task file with archived flag
+      await this.directoryManager.writeTask(archivedTodo);
+
+      // Remove symlinks (archived todos don't appear in views)
+      await this.symlinkManager.removeSymlinks(todo);
+
+      // Update in-memory cache
+      this.todos[index] = archivedTodo;
+    }
   }
 
   /**
@@ -586,5 +642,88 @@ export class TodoRepository {
       assignees: await this.getAssignees(),
       priorities: await this.getPriorities()
     };
+  }
+
+  /**
+   * Check if repository is using legacy format (todos.json)
+   * Returns true if todos.json exists and todos/ directory doesn't exist
+   */
+  async isLegacyFormat(): Promise<boolean> {
+    try {
+      // Check if todos.json exists
+      await fs.access(this.todosFilePath);
+
+      // If todos/ directory also exists, we've already migrated
+      try {
+        await fs.access(path.join(this.repoPath, 'todos'));
+        return false; // Already migrated
+      } catch {
+        return true; // Legacy format
+      }
+    } catch {
+      return false; // No todos.json (new installation)
+    }
+  }
+
+  /**
+   * Migrate from legacy todos.json to directory-based persistence
+   *
+   * This method performs an automatic migration from the single-file format
+   * to the new directory-based structure with symlink views.
+   *
+   * Migration steps:
+   * 1. Create backup of todos.json (todos.json.backup)
+   * 2. Load all todos from legacy file
+   * 3. Create new directory structure (todos/tasks/, todos/by-*)
+   * 4. Write each todo to individual directory (todos/tasks/{id}/)
+   * 5. Create all symlinks for organizational views
+   * 6. Remove original todos.json file
+   * 7. Commit migration to Git
+   *
+   * Safety features:
+   * - Creates backup before any modifications
+   * - Atomic Git commit of all changes
+   * - Throws error on failure (caller should handle rollback)
+   *
+   * @throws {Error} If migration fails at any step
+   */
+  async migrateLegacyToDirectory(): Promise<void> {
+    try {
+      // Step 1: Create backup
+      const backupPath = `${this.todosFilePath}.backup`;
+      await fs.copyFile(this.todosFilePath, backupPath);
+
+      // Step 2: Load todos from legacy file
+      const content = await fs.readFile(this.todosFilePath, 'utf-8');
+      const data = JSON.parse(content);
+      const todos: Todo[] = data.todos || [];
+
+      // Step 3: Create directory structure
+      await this.directoryManager.ensureDirectoryStructure();
+
+      // Step 4: Write all todos to individual directories
+      for (const todo of todos) {
+        await this.directoryManager.writeTask(todo);
+      }
+
+      // Step 5: Create all symlinks
+      await this.symlinkManager.rebuildAllSymlinks(todos);
+
+      // Step 6: Remove todos.json
+      await fs.unlink(this.todosFilePath);
+
+      // Step 7: Commit migration
+      await this.gitManager.commit(
+        'chore: migrate from todos.json to directory-based persistence\n\n' +
+        'Automatic migration from single-file format to directory structure with symlink views.\n\n' +
+        `Migrated ${todos.length} todos to individual directories.`
+      );
+
+    } catch (error) {
+      throw new Error(
+        `Migration failed: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        `Check backup at ${this.todosFilePath}.backup`
+      );
+    }
   }
 }

@@ -227,7 +227,9 @@ npm run preview
 - **Inline Filters**: Filter by search text, project, priority, tags, and assignee
 - **Active Filters Display**: See all active filters with individual clear buttons
 - **Statistics**: Real-time completion rates and status breakdown
-- **Add Todos**: Create new todos directly from the board
+- **Add Todos**: Create new todos directly from the board with intelligent project autocomplete
+- **Edit Todos**: Double-click any card to view details and edit all fields
+- **Project Autocomplete**: Search existing projects or create new ones - prevents typos and duplicates
 - **Priority Colors**: Visual indicators for low, medium, high, and urgent priorities
 - **Responsive Design**: Works on desktop and mobile devices
 
