@@ -59,13 +59,13 @@ npm run build
 mkdir ~/my-todos
 cd ~/my-todos
 git init
-echo '{"todos": []}' > todos.json
-git add .
-git commit -m "Initial commit"
+git commit --allow-empty -m "Initial commit"
 # Optional: Add remote repository
 git remote add origin https://github.com/yourusername/my-todos.git
 git push -u origin main
 ```
+
+**Note**: The system will automatically create the directory structure on first use. If you have an existing `todos.json` file, it will be automatically migrated to the new directory structure with a backup created.
 
 5. Configure Claude Desktop or Claude Code:
 
@@ -294,42 +294,94 @@ Once configured, you can use natural language commands in Claude:
 
 ## Data Model
 
-Todos are stored in `todos.json` with the following structure:
+### Directory-Based Storage
+
+Todos are stored in a directory structure for better scalability, artifact support, and reduced merge conflicts:
+
+```
+todos/
+├── tasks/                          # Primary storage
+│   ├── {task-id}/
+│   │   ├── task.json              # Todo metadata
+│   │   ├── README.md              # Long descriptions (>300 chars)
+│   │   └── artifacts/             # Attached files (future)
+│   └── {task-id-2}/
+│       └── task.json
+├── by-project/                     # Symlink views
+│   ├── work/
+│   │   └── {task-id} → ../../tasks/{task-id}/
+│   └── personal/
+│       └── {task-id} → ../../tasks/{task-id}/
+├── by-status/
+│   ├── todo/ → ../../tasks/{task-id}/
+│   ├── in-progress/
+│   ├── blocked/
+│   └── done/
+├── by-priority/
+│   ├── urgent/
+│   ├── high/
+│   ├── medium/
+│   └── low/
+├── by-tag/
+│   └── {tag}/ → ../../tasks/{task-id}/
+└── by-assignee/
+    └── {user}/ → ../../tasks/{task-id}/
+```
+
+### Todo JSON Structure
+
+Each `task.json` file contains:
 
 ```json
 {
-  "todos": [
-    {
-      "id": "uuid",
-      "text": "Task description",
-      "status": "todo",
-      "priority": "medium",
-      "project": "work",
-      "tags": ["backend", "urgent"],
-      "assignee": "user-id",
-      "createdBy": "user-id",
-      "createdAt": "ISO8601",
-      "modifiedAt": "ISO8601",
-      "dueDate": "ISO8601",
-      "completedAt": "ISO8601",
-      "dependencies": ["todo-id"],
-      "subtasks": [{"id": "uuid", "text": "Subtask", "completed": false}],
-      "comments": [{"id": "uuid", "user": "user-id", "text": "Comment", "timestamp": "ISO8601"}],
-      "fieldTimestamps": {
-        "text": "ISO8601",
-        "status": "ISO8601"
-      }
-    }
-  ]
+  "id": "uuid",
+  "text": "Task description",
+  "status": "todo",
+  "priority": "medium",
+  "project": "work",
+  "tags": ["backend", "urgent"],
+  "assignee": "user-id",
+  "createdBy": "user-id",
+  "createdAt": "ISO8601",
+  "modifiedAt": "ISO8601",
+  "dueDate": "ISO8601",
+  "completedAt": "ISO8601",
+  "dependencies": ["todo-id"],
+  "subtasks": [{"id": "uuid", "text": "Subtask", "completed": false}],
+  "comments": [{"id": "uuid", "user": "user-id", "text": "Comment", "timestamp": "ISO8601"}],
+  "fieldTimestamps": {
+    "text": "ISO8601",
+    "status": "ISO8601"
+  }
 }
 ```
+
+### Benefits
+
+- **Artifact Support**: Store images, documents, and files alongside tasks
+- **Reduced Conflicts**: Per-task files minimize merge conflict scope
+- **Scalability**: Handles 10,000+ tasks efficiently
+- **Flexible Organization**: Multiple views via symlinks (by project, status, priority, tags, assignee)
+- **Rich Metadata**: Support for README.md files for detailed descriptions
+- **Git-Friendly**: Granular diffs and clear history
+
+### Automatic Migration
+
+If you have an existing `todos.json` file, it will be automatically migrated to the directory structure on first use:
+- Creates backup as `todos.json.backup`
+- Converts all todos to directory format
+- Rebuilds all symlink views
+- Commits migration to Git
+- Zero data loss guaranteed
 
 ## Conflict Resolution
 
 The system uses a Last-Write-Wins (LWW) strategy at the field level:
-- Each field has its own timestamp
+- Each field has its own timestamp in `fieldTimestamps`
 - When conflicts occur, the field with the most recent timestamp wins
 - Non-conflicting fields are merged from both versions
+- Per-file resolution: Conflicts are resolved at the individual `task.json` level, not globally
+- README.md conflicts use modification time from the task's `modifiedAt` field
 
 ## Development
 
@@ -370,7 +422,9 @@ npm run test:watch
 │   │   ├── ConflictResolver.ts  # LWW merge logic
 │   │   └── SyncManager.ts       # Sync coordination
 │   ├── data/
-│   │   └── TodoRepository.ts    # Todo CRUD operations
+│   │   ├── TodoRepository.ts    # Todo CRUD operations
+│   │   ├── DirectoryManager.ts  # Task directory operations
+│   │   └── SymlinkManager.ts    # Symlink view management
 │   └── types/
 │       └── Todo.ts              # Todo types and validation
 ├── web/                         # Svelte 5 web frontend
@@ -391,10 +445,25 @@ npm run test:watch
 │   └── vite.config.ts           # Vite configuration
 ├── tests/
 │   ├── unit/                    # Unit tests
-│   └── integration/             # Integration tests
-├── my-todos/                    # Example todo repository
-│   └── todos.json              # Todo database
+│   ├── integration/             # Integration tests
+│   └── performance/             # Performance benchmarks
+├── docs/
+│   ├── adr/                     # Architecture Decision Records
+│   └── releases/                # Release notes
 └── dist/                        # Compiled JavaScript
+
+Example todo repository structure (~/my-todos/):
+todos/
+├── tasks/
+│   └── {task-id}/
+│       ├── task.json
+│       ├── README.md (optional)
+│       └── artifacts/ (future)
+├── by-project/
+├── by-status/
+├── by-priority/
+├── by-tag/
+└── by-assignee/
 ```
 
 ### Test Coverage
@@ -465,11 +534,13 @@ Ensure the MCP server has read/write access to:
 Comprehensive documentation is available in the `docs/` directory:
 
 - **[QUICKSTART.md](docs/QUICKSTART.md)** - Quick start guide for running the kanban board
+- **[MIGRATION.md](docs/MIGRATION.md)** - Migration guide from legacy todos.json to directory structure
 - **[CLAUDE_CODE_EXAMPLES.md](docs/CLAUDE_CODE_EXAMPLES.md)** - Configuration and usage examples for Claude Code and Claude Desktop
 - **[TEST_GUIDE.md](docs/TEST_GUIDE.md)** - Testing instructions and scenarios
 - **[TESTING_LIMITATIONS.md](docs/TESTING_LIMITATIONS.md)** - Known testing limitations with Svelte 5 runes
 - **[CHANGELOG.md](docs/CHANGELOG.md)** - Version history and release notes
 - **[docs/adr/](docs/adr/)** - Architecture Decision Records
+  - **[ADR-002](docs/adr/002-directory-based-persistence/)** - Directory-Based Persistence Architecture
 - **[docs/releases/](docs/releases/)** - Detailed release notes for each version
 
 ## Contributing
