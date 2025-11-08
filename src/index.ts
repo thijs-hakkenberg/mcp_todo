@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-// Load environment variables from .env file
+// Load environment variables from .env file (silently)
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ debug: false });
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';

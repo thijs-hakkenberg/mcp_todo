@@ -118,11 +118,19 @@ export class MCPClient extends EventEmitter {
       this.buffer = this.buffer.slice(newlineIndex + 1);
 
       if (line.trim()) {
+        // Skip non-JSON lines (e.g., dotenv messages, debug output)
+        // JSON-RPC messages always start with { and contain "jsonrpc"
+        if (!line.trim().startsWith('{')) {
+          // Silently ignore non-JSON lines (likely informational messages)
+          continue;
+        }
+
         try {
           const response: JSONRPCResponse = JSON.parse(line);
           this.handleResponse(response);
         } catch (error) {
-          console.error('Failed to parse JSON response:', line, error);
+          // Only log parse errors for lines that look like JSON
+          console.error('Failed to parse JSON-RPC response:', line.substring(0, 100) + '...');
         }
       }
     }

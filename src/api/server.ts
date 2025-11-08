@@ -1,6 +1,6 @@
-// Load environment variables from .env file
+// Load environment variables from .env file (silently)
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ debug: false });
 
 import express from 'express';
 import cors from 'cors';
