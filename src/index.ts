@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// Load environment variables from .env file
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -44,7 +48,6 @@ async function main() {
   const mcpServer = new MCPServer(todoRepo, syncManager, gitManager);
 
   // Initialize Git repository
-  console.error('Initializing Git repository...');
   await gitManager.initialize(TODO_REPO_URL);
 
   // Configure Git user

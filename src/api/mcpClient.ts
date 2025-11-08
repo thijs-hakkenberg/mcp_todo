@@ -79,8 +79,17 @@ export class MCPClient extends EventEmitter {
     });
 
     // Handle stderr (errors/logs)
+    // Note: MCP server uses stderr for ALL logging (stdout is reserved for JSON-RPC)
     this.process.stderr?.on('data', (data: Buffer) => {
-      console.error('MCP Server Error:', data.toString());
+      const message = data.toString().trim();
+      // Distinguish between actual errors and informational messages
+      if (message.toLowerCase().includes('error') ||
+          message.toLowerCase().includes('failed') ||
+          message.toLowerCase().includes('warning')) {
+        console.error('[MCP Server]', message);
+      } else {
+        console.log('[MCP Server]', message);
+      }
     });
 
     // Handle process exit

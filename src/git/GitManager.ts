@@ -47,7 +47,11 @@ export class GitManager {
       const isRepo = await this.git.checkIsRepo();
 
       if (!isRepo) {
+        console.error('Creating new Git repository...');
         await this.git.init();
+        console.error('Git repository created successfully');
+      } else {
+        console.error('Loading existing Git repository...');
       }
 
       // Add remote if provided and doesn't exist
@@ -56,6 +60,7 @@ export class GitManager {
         const hasOrigin = remotes.some(r => r.name === 'origin');
 
         if (!hasOrigin) {
+          console.error(`Adding remote 'origin': ${remoteUrl}`);
           await this.git.addRemote('origin', remoteUrl);
         }
       }
