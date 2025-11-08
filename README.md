@@ -118,7 +118,13 @@ The kanban board consists of two components:
 
 ### Quick Start (Recommended)
 
-Use the provided startup scripts for the easiest experience:
+1. Configure your environment by creating a `.env` file:
+```bash
+cp .env.example .env
+# Edit .env with your TODO_REPO_PATH and Git credentials
+```
+
+2. Use the provided startup scripts for the easiest experience:
 
 ```bash
 # Terminal 1: Start backend
@@ -129,6 +135,8 @@ Use the provided startup scripts for the easiest experience:
 ```
 
 Then open http://localhost:5173 in your browser.
+
+**Note**: The startup scripts will use default values if environment variables are not set, but it's recommended to configure `.env` with your actual repository path.
 
 See [QUICKSTART.md](docs/QUICKSTART.md) for detailed instructions and troubleshooting.
 
@@ -150,19 +158,55 @@ cd ..
 npm run build
 ```
 
-3. Start the API server:
+3. Configure environment variables:
+
+**Option A: Create a .env file (Recommended)**
+
+Create a `.env` file in the project root with your configuration:
+
 ```bash
-# Using the same environment variables as Claude Desktop
+cp .env.example .env
+# Edit .env with your values
+```
+
+Example `.env` file:
+```bash
+# Path to your Git repository for storing todos
+TODO_REPO_PATH=/Users/you/my-todos
+
+# Optional: Remote Git repository URL for syncing
+TODO_REPO_URL=https://github.com/you/my-todos.git
+
+# Git user configuration
+GIT_USER_NAME=Your Name
+GIT_USER_EMAIL=you@example.com
+
+# Optional: Auto-sync configuration
+AUTO_SYNC=false
+SYNC_INTERVAL_SECONDS=300
+
+# API server configuration
+PORT=3001
+CORS_ORIGIN=http://localhost:5173
+NODE_ENV=development
+```
+
+**Option B: Export environment variables manually**
+
+```bash
 export TODO_REPO_PATH="/Users/you/my-todos"
 export TODO_REPO_URL="https://github.com/you/my-todos.git"
 export GIT_USER_NAME="Your Name"
 export GIT_USER_EMAIL="you@example.com"
+```
 
-# Start the API server (runs on port 3001)
+4. Start the API server:
+```bash
+# If using .env file, it will be loaded automatically
 npm run start:api
 ```
 
-4. In a separate terminal, start the web frontend:
+5. In a separate terminal, start the web frontend:
 ```bash
 cd web
 npm run dev
