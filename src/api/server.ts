@@ -71,18 +71,7 @@ export function createApp(): express.Application {
     });
   });
 
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received, closing connections...');
-    mcpClient.disconnect();
-  });
-
-  process.on('SIGINT', () => {
-    console.log('SIGINT received, closing connections...');
-    mcpClient.disconnect();
-  });
-
-  // Store MCP client for cleanup
+  // Store MCP client for cleanup and signal handling
   (app as any).mcpClient = mcpClient;
 
   // Override listen to handle cleanup
@@ -107,6 +96,7 @@ export function createApp(): express.Application {
  */
 export function startServer(port: number = 3001): void {
   const app = createApp();
+  const mcpClient = (app as any).mcpClient;
 
   const server = app.listen(port, () => {
     console.log(`API server listening on port ${port}`);
@@ -122,6 +112,35 @@ export function startServer(port: number = 3001): void {
       console.error('Server error:', error);
     }
   });
+
+  // Graceful shutdown handler
+  const shutdown = (signal: string) => {
+    console.log(`\n${signal} received, shutting down gracefully...`);
+
+    // Close HTTP server
+    server.close(() => {
+      console.log('HTTP server closed');
+
+      // Disconnect MCP client
+      if (mcpClient) {
+        mcpClient.disconnect();
+        console.log('MCP client disconnected');
+      }
+
+      console.log('Shutdown complete');
+      process.exit(0);
+    });
+
+    // Force exit after 10 seconds if graceful shutdown fails
+    setTimeout(() => {
+      console.error('Forcefully shutting down after timeout');
+      process.exit(1);
+    }, 10000);
+  };
+
+  // Register signal handlers
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 // Start server if run directly
