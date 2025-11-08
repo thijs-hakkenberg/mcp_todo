@@ -23,7 +23,7 @@
 </script>
 
 <button
-  on:click={() => themeStore.toggleTheme()}
+  onclick={() => themeStore.toggleTheme()}
   class="px-3 py-1.5 rounded flex items-center gap-1.5 transition-all text-sm font-medium"
   style="
     background-color: #1e1f22;

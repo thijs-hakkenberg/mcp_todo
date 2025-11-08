@@ -75,11 +75,18 @@ export function createTodoStore() {
 
   const columnTodos = $derived.by(() => {
     const filtered = filteredTodos;
+
+    // Sort by creation date (newest first)
+    const sortByDate = (todos: Todo[]) =>
+      [...todos].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
     return {
-      'todo': filtered.filter(t => t.status === 'todo'),
-      'in-progress': filtered.filter(t => t.status === 'in-progress'),
-      'blocked': filtered.filter(t => t.status === 'blocked'),
-      'done': filtered.filter(t => t.status === 'done')
+      'todo': sortByDate(filtered.filter(t => t.status === 'todo')),
+      'in-progress': sortByDate(filtered.filter(t => t.status === 'in-progress')),
+      'blocked': sortByDate(filtered.filter(t => t.status === 'blocked')),
+      'done': sortByDate(filtered.filter(t => t.status === 'done'))
     };
   });
 
@@ -156,7 +163,7 @@ export function createTodoStore() {
       const data = await response.json();
 
       if (data.success) {
-        todos = [...todos, data.todo];
+        todos = [data.todo, ...todos];
       } else {
         throw new Error(data.error || 'Failed to create todo');
       }
