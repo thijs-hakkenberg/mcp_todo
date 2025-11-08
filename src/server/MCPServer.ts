@@ -90,7 +90,7 @@ export class MCPServer {
             mode: {
               type: 'string',
               enum: ['minimal', 'standard', 'full'],
-              description: 'Field selection mode: minimal (id, text, status, priority, project), standard (+ tags, assignee, dates), full (all fields)'
+              description: 'Field selection mode: minimal (id, text, status, priority, project), standard (+ tags, assignee, dates) [default], full (all fields including subtasks, comments, dependencies, fieldTimestamps)'
             },
             fields: {
               type: 'array',

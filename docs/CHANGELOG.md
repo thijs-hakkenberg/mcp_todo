@@ -5,6 +5,24 @@ All notable changes to the Git-Based MCP Todo Server will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2025-11-08
+
+### Changed - Performance Optimization
+- **Reduced default context size in MCP tool responses**
+  - Changed default field selection mode from `'full'` to `'standard'` for `list_todos` tool
+  - **Impact**: Significantly reduces token usage and response size for LLM clients (Claude Desktop, Claude Code)
+  - **Standard mode** returns 11 fields: id, text, status, priority, project, tags, assignee, createdAt, modifiedAt, dueDate, completedAt
+  - **Full mode** (still available via `mode: 'full'`) returns all 16+ fields including: description, subtasks, comments, dependencies, fieldTimestamps, createdBy, archived, archivedAt
+  - **Backward compatibility**: Users can explicitly request `mode: 'full'` to get all fields
+  - **Benefit**: Faster responses, lower token costs, better performance for common list operations
+  - Updated MCP tool description to document the new default behavior
+
+### Technical Details
+- Modified `TodoRepository.ts:356` to default to `'standard'` mode instead of `'full'`
+- Updated `MCPServer.ts:93` tool description to indicate standard mode as default
+- All functional tests pass (321/321)
+- No breaking changes - full mode still available when needed
+
 ## [1.9.0] - 2025-11-08
 
 ### Added - Directory-Based Persistence (ADR-002)

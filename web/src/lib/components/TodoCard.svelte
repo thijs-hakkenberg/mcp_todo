@@ -25,8 +25,9 @@
   }
 
   function getSubtaskProgress(): string {
-    const completed = todo.subtasks.filter(s => s.completed).length;
-    return `${completed}/${todo.subtasks.length}`;
+    const subtasks = todo.subtasks || [];
+    const completed = subtasks.filter(s => s.completed).length;
+    return `${completed}/${subtasks.length}`;
   }
 
   const priorityColors = {
@@ -113,7 +114,7 @@
         </span>
       {/if}
 
-      {#if todo.subtasks.length > 0}
+      {#if todo.subtasks && todo.subtasks.length > 0}
         <span class="flex items-center">
           <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>

@@ -58,6 +58,31 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
       }
 
       const result = await mcpClient.callTool('list_todos', filters);
+
+      // Generate ETag based on query params and latest modification
+      if (result.success && result.todos && result.todos.length > 0) {
+        // Find the most recently modified todo
+        const latestModified = result.todos.reduce((latest: string, todo: any) => {
+          const todoTime = new Date(todo.modifiedAt).getTime();
+          const latestTime = latest ? new Date(latest).getTime() : 0;
+          return todoTime > latestTime ? todo.modifiedAt : latest;
+        }, '');
+
+        // Generate ETag combining query hash and latest modification time
+        const queryHash = JSON.stringify(filters);
+        const etag = `"list-${Buffer.from(queryHash).toString('base64').substring(0, 16)}-${new Date(latestModified).getTime()}"`;
+
+        // Check If-None-Match header
+        if (req.headers['if-none-match'] === etag) {
+          res.status(304).end(); // Not Modified
+          return;
+        }
+
+        // Set ETag and cache headers
+        res.set('ETag', etag);
+        res.set('Cache-Control', 'private, must-revalidate, max-age=0');
+      }
+
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -101,6 +126,19 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
         return;
       }
 
+      // Generate ETag from todo's ID and modifiedAt timestamp
+      const todo = result.todo;
+      const etag = `"${todo.id}-${new Date(todo.modifiedAt).getTime()}"`;
+
+      // Check If-None-Match header for conditional GET
+      if (req.headers['if-none-match'] === etag) {
+        res.status(304).end(); // Not Modified
+        return;
+      }
+
+      // Set ETag and cache headers
+      res.set('ETag', etag);
+      res.set('Cache-Control', 'private, must-revalidate');
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -158,6 +196,33 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
   // Update todo
   router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     try {
+      // Check If-Match header for optimistic locking
+      const ifMatch = req.headers['if-match'];
+
+      if (ifMatch) {
+        // Get current todo to validate ETag
+        const currentResult = await mcpClient.callTool('get_todo', { id: req.params.id });
+
+        if (!currentResult.success) {
+          res.status(404).json({ error: currentResult.error || 'Todo not found' });
+          return;
+        }
+
+        const currentTodo = currentResult.todo;
+        const currentETag = `"${currentTodo.id}-${new Date(currentTodo.modifiedAt).getTime()}"`;
+
+        // Check if ETags match
+        if (ifMatch !== currentETag) {
+          res.status(412).json({
+            error: 'Precondition Failed: Todo was modified by another client',
+            currentVersion: currentTodo,
+            expectedETag: ifMatch,
+            actualETag: currentETag
+          });
+          return;
+        }
+      }
+
       const updates = { ...req.body, id: req.params.id };
       const result = await mcpClient.callTool('update_todo', updates);
 
@@ -165,6 +230,12 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
         res.status(404).json({ error: result.error || 'Todo not found' });
         return;
       }
+
+      // Set new ETag for the updated todo
+      const updatedTodo = result.todo;
+      const newETag = `"${updatedTodo.id}-${new Date(updatedTodo.modifiedAt).getTime()}"`;
+      res.set('ETag', newETag);
+      res.set('Cache-Control', 'private, must-revalidate');
 
       res.json(result);
     } catch (error: any) {
@@ -243,6 +314,33 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
   // Delete todo
   router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
     try {
+      // Check If-Match header for optimistic locking
+      const ifMatch = req.headers['if-match'];
+
+      if (ifMatch) {
+        // Get current todo to validate ETag
+        const currentResult = await mcpClient.callTool('get_todo', { id: req.params.id });
+
+        if (!currentResult.success) {
+          res.status(404).json({ error: currentResult.error || 'Todo not found' });
+          return;
+        }
+
+        const currentTodo = currentResult.todo;
+        const currentETag = `"${currentTodo.id}-${new Date(currentTodo.modifiedAt).getTime()}"`;
+
+        // Check if ETags match
+        if (ifMatch !== currentETag) {
+          res.status(412).json({
+            error: 'Precondition Failed: Todo was modified by another client',
+            currentVersion: currentTodo,
+            expectedETag: ifMatch,
+            actualETag: currentETag
+          });
+          return;
+        }
+      }
+
       const result = await mcpClient.callTool('delete_todo', { id: req.params.id });
 
       if (!result.success) {

@@ -50,7 +50,10 @@ export const TodoSchema = z.object({
   dependencies: z.array(z.string().uuid()),
   subtasks: z.array(SubtaskSchema),
   comments: z.array(CommentSchema),
-  fieldTimestamps: FieldTimestampsSchema
+  fieldTimestamps: FieldTimestampsSchema,
+  // Archive fields (for soft delete)
+  archived: z.boolean().optional(),
+  archivedAt: z.string().datetime().optional()
 });
 
 // Type inference from schema
