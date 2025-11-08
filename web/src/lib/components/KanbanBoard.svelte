@@ -1,10 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { marked } from 'marked';
   import { todoStore } from '../stores/todos.svelte';
   import type { Todo } from '../types/Todo';
   import FilterBar from './FilterBar.svelte';
   import KanbanColumn from './KanbanColumn.svelte';
   import ProjectAutocomplete from './ProjectAutocomplete.svelte';
+
+  // Configure marked for safe HTML rendering
+  marked.setOptions({
+    breaks: true,
+    gfm: true
+  });
 
   let { allowColumnReorder = false, readOnly = false } = $props<{
     allowColumnReorder?: boolean;
@@ -71,6 +78,19 @@
 
   async function handleRefresh() {
     await todoStore.loadTodos();
+  }
+
+  function renderMarkdown(text: string): string {
+    try {
+      return marked(text) as string;
+    } catch (error) {
+      console.error('Error rendering markdown:', error);
+      return text;
+    }
+  }
+
+  function hasLongDescription(todo: Todo): boolean {
+    return todo.description?.length > 300 || todo.description === '[See README.md]';
   }
 
   const columns = [
@@ -170,8 +190,17 @@
 
           {#if selectedTodo.description}
             <div class="mb-4">
-              <h3 class="text-sm font-medium text-gray-700 mb-1">Description</h3>
-              <p class="text-gray-600">{selectedTodo.description}</p>
+              <h3 class="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                Description
+                {#if hasLongDescription(selectedTodo)}
+                  <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Long description">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                {/if}
+              </h3>
+              <div class="prose prose-sm max-w-none text-gray-600">
+                {@html renderMarkdown(selectedTodo.description)}
+              </div>
             </div>
           {/if}
 
