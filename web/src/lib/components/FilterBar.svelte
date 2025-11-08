@@ -98,7 +98,7 @@
             id="searchInput"
             placeholder="Search todos..."
             value={todoStore.filters.search}
-            oninput={handleSearchInput}
+            on:input={handleSearchInput}
             class="w-full px-3 py-1.5 pl-10 pr-4 border rounded text-sm focus:outline-none transition-all"
             style="
               background-color: #1e1f22;
@@ -126,7 +126,7 @@
           <input
             type="checkbox"
             checked={todoStore.filters.includeCompleted}
-            onchange={handleIncludeCompletedToggle}
+            on:change={handleIncludeCompletedToggle}
             class="w-4 h-4 rounded focus:ring-0"
             style="
               appearance: none;
@@ -139,7 +139,7 @@
         </label>
         <button
           id="clearFilters"
-          onclick={clearAllFilters}
+          on:click={clearAllFilters}
           class="px-3 py-1.5 border rounded text-sm font-medium transition-all"
           style="
             background-color: #1e1f22;
@@ -186,7 +186,7 @@
                       : priority === 'low' ? 'text-green-700 border-green-300 hover:bg-green-50'
                       : ''
                     }`}"
-                onclick={() => handlePriorityFilter(priority)}
+                on:click={() => handlePriorityFilter(priority)}
               >
                 {priority.charAt(0).toUpperCase() + priority.slice(1)}
               </button>
@@ -212,7 +212,7 @@
             {#each assignees as assignee}
               <button
                 class="filter-chip px-3 py-1 text-xs rounded-full border transition-colors {todoStore.filters.assignee === assignee ? 'bg-blue-100 dark:bg-blue-900 border-blue-500 text-blue-700 dark:text-blue-200' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'}"
-                onclick={() => handleAssigneeFilter(assignee)}
+                on:click={() => handleAssigneeFilter(assignee)}
               >
                 {assignee === 'all' ? 'All' : assignee === 'unassigned' ? 'Unassigned' : assignee === 'me' ? 'Me' : 'Team'}
               </button>
@@ -230,7 +230,7 @@
               {#if todoStore.filters.search}
                 <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                   Search: {todoStore.filters.search}
-                  <button class="ml-1 hover:text-blue-900" onclick={() => todoStore.setSearchFilter('')}>
+                  <button class="ml-1 hover:text-blue-900" on:click={() => todoStore.setSearchFilter('')}>
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
@@ -241,7 +241,7 @@
               {#each todoStore.filters.projects as project}
                 <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                   Project: {project}
-                  <button class="ml-1 hover:text-blue-900" onclick={() => {
+                  <button class="ml-1 hover:text-blue-900" on:click={() => {
                     selectedProjects = selectedProjects.filter(p => p !== project);
                   }}>
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -254,7 +254,7 @@
               {#if todoStore.filters.priority !== 'all'}
                 <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                   Priority: {todoStore.filters.priority}
-                  <button class="ml-1 hover:text-blue-900" onclick={() => todoStore.setPriorityFilter('all')}>
+                  <button class="ml-1 hover:text-blue-900" on:click={() => todoStore.setPriorityFilter('all')}>
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
@@ -265,7 +265,7 @@
               {#each todoStore.filters.tags as tag}
                 <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                   Tag: {tag}
-                  <button class="ml-1 hover:text-blue-900" onclick={() => {
+                  <button class="ml-1 hover:text-blue-900" on:click={() => {
                     selectedTags = selectedTags.filter(t => t !== tag);
                   }}>
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -278,7 +278,7 @@
               {#if todoStore.filters.assignee !== 'all'}
                 <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                   Assignee: {todoStore.filters.assignee}
-                  <button class="ml-1 hover:text-blue-900" onclick={() => todoStore.setAssigneeFilter('all')}>
+                  <button class="ml-1 hover:text-blue-900" on:click={() => todoStore.setAssigneeFilter('all')}>
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
