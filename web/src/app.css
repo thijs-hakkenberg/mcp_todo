@@ -1,10 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-priority-urgent: #ef4444;
-  --color-priority-high: #f97316;
-  --color-priority-medium: #eab308;
-  --color-priority-low: #22c55e;
+  /* DaVinci Resolve Design System - Background Colors */
+  --color-bg-darkest: #0e0e10;
+  --color-bg-darker: #141416;
+  --color-bg-dark: #191a1c;
+  --color-bg-medium: #1e1f22;
+  --color-bg-light: #232528;
+  --color-bg-lighter: #28292e;
+  --color-bg-hover: #2a2b30;
+
+  /* Border Colors */
+  --color-border-subtle: #23252a;
+  --color-border-default: #2a2c32;
+  --color-border-emphasis: #36383e;
+
+  /* Text Colors */
+  --color-text-muted: #606268;
+  --color-text-dim: #7a7c82;
+  --color-text-normal: #9a9ca2;
+  --color-text-bright: #d4d5d9;
+  --color-text-white: #e8e9ec;
+
+  /* Accent Colors */
+  --color-accent-orange: #e8724e;
+  --color-accent-orange-hover: #f07d55;
+  --color-accent-orange-dim: #c86343;
+
+  --color-accent-red: #d84855;
+  --color-accent-red-dim: #b83d48;
+
+  --color-accent-yellow: #e8a84e;
+  --color-accent-yellow-dim: #c98f42;
+
+  --color-accent-blue: #4a9aef;
+  --color-accent-blue-dim: #3d82ca;
+
+  --color-accent-green: #5cb365;
+  --color-accent-green-dim: #4d9756;
+
+  /* Priority Colors (mapped to design system) */
+  --color-priority-urgent: #d84855;
+  --color-priority-high: #e8724e;
+  --color-priority-medium: #e8a84e;
+  --color-priority-low: #5cb365;
+}
+
+/* Global Font Configuration */
+* {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Priority border color utilities */
+.border-priority-urgent {
+  border-color: var(--color-priority-urgent);
+}
+
+.border-priority-high {
+  border-color: var(--color-priority-high);
+}
+
+.border-priority-medium {
+  border-color: var(--color-priority-medium);
+}
+
+.border-priority-low {
+  border-color: var(--color-priority-low);
 }
 
 /* Markdown/Prose styles */

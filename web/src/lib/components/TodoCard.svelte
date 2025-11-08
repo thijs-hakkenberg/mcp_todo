@@ -57,25 +57,34 @@
 </script>
 
 <div
-  class="todo-card bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-move border-l-4 {priorityColors[todo.priority]} {todo.status === 'done' ? 'opacity-75' : ''}"
+  class="todo-card rounded-lg p-4 shadow-sm cursor-move border-l-4 {priorityColors[todo.priority]} {todo.status === 'done' ? 'opacity-75' : ''} transition-all"
+  style="background-color: #191a1c;"
   draggable={draggable}
   ondblclick={handleDblClick}
+  onmouseenter={(e) => {
+    e.currentTarget.style.backgroundColor = '#1e1f22';
+    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.3)';
+  }}
+  onmouseleave={(e) => {
+    e.currentTarget.style.backgroundColor = '#191a1c';
+    e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.1)';
+  }}
   role="button"
   tabindex="0"
   onkeydown={(e) => e.key === 'Enter' && handleDblClick()}
   title="Double-click to view details"
 >
-  <div class="flex items-start justify-between mb-2">
-    <h3 class="font-medium text-gray-900 {todo.status === 'done' ? 'line-through' : ''}">
+  <div class="flex items-start justify-between mb-3">
+    <h3 class="font-medium text-sm {todo.status === 'done' ? 'line-through' : ''}" style="color: #e8e9ec;">
       {todo.text}
     </h3>
-    <span class="text-xs px-2 py-1 rounded-full font-medium {priorityBadgeColors[todo.priority]}">
+    <span class="text-xs px-2.5 py-1 rounded font-medium {priorityBadgeColors[todo.priority]}">
       {priorityLabels[todo.priority]}
     </span>
   </div>
 
   {#if todo.description}
-    <p class="text-sm text-gray-600 mb-3">{todo.description}</p>
+    <p class="text-sm mb-3" style="color: #9a9ca2;">{todo.description}</p>
   {/if}
 
   {#if todo.status === 'blocked'}
@@ -99,9 +108,9 @@
       {/each}
     </div>
 
-    <div class="flex items-center gap-3 text-xs text-gray-500">
+    <div class="flex items-center gap-3 text-xs" style="color: #7a7c82;">
       {#if hasLongDescription()}
-        <span class="flex items-center text-blue-600" title="Has detailed description">
+        <span class="flex items-center" style="color: #4a9aef;" title="Has detailed description">
           <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
