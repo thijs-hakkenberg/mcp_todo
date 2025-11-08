@@ -126,7 +126,7 @@
             style="background-color: #e8724e;"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = '#f07d55'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = '#e8724e'}
-            on:click={handleRefresh}
+            onclick={handleRefresh}
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -187,7 +187,7 @@
             <h2 class="text-xl font-bold text-gray-900">{selectedTodo.text}</h2>
             <button
               class="text-gray-400 hover:text-gray-600"
-              on:click={closeModal}
+              onclick={closeModal}
             >
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -267,14 +267,14 @@
           <div class="flex justify-end gap-2 mt-6">
             <button
               class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              on:click={closeModal}
+              onclick={closeModal}
             >
               Close
             </button>
             {#if !readOnly}
               <button
                 class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                on:click={() => {
+                onclick={() => {
                   if (selectedTodo) {
                     handleEditTodo(selectedTodo);
                   }
@@ -296,7 +296,8 @@
         <div class="p-6">
           <h2 class="text-xl font-bold text-gray-900 mb-4">Add New Todo</h2>
 
-          <form on:submit|preventDefault={async (e) => {
+          <form onsubmit={async (e) => {
+            e.preventDefault();
             if (isSubmitting) return; // Prevent double submission
             isSubmitting = true;
 
@@ -382,7 +383,7 @@
               <button
                 type="button"
                 class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                on:click={closeModal}
+                onclick={closeModal}
               >
                 Cancel
               </button>
@@ -407,7 +408,8 @@
         <div class="p-6">
           <h2 class="text-xl font-bold text-gray-900 mb-4">Edit Todo</h2>
 
-          <form on:submit|preventDefault={async (e) => {
+          <form onsubmit={async (e) => {
+            e.preventDefault();
             if (isSubmitting) return; // Prevent double submission
             isSubmitting = true;
 
@@ -512,7 +514,7 @@
               <button
                 type="button"
                 class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                on:click={closeModal}
+                onclick={closeModal}
               >
                 Cancel
               </button>

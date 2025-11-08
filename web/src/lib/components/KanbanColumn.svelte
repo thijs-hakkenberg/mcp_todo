@@ -71,10 +71,10 @@
 
 <div
   class="kanban-column flex flex-col h-full rounded-lg border-2 transition-all {statusColors[status]} {isDragOver ? 'border-blue-400 shadow-lg' : ''}"
-  on:dragover={handleDragOver}
-  on:dragenter={handleDragEnter}
-  on:dragleave={handleDragLeave}
-  on:drop={handleDrop}
+  ondragover={handleDragOver}
+  ondragenter={handleDragEnter}
+  ondragleave={handleDragLeave}
+  ondrop={handleDrop}
 >
   <!-- Column Header -->
   <div class="px-4 py-3 rounded-t-lg {statusHeaderColors[status]}">
@@ -91,7 +91,7 @@
     <div class="p-3 border-b border-gray-200">
       <button
         class="add-todo-button w-full py-2 px-3 text-sm text-gray-600 hover:text-gray-900 hover:bg-white hover:bg-opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-        on:click={handleAddClick}
+        onclick={handleAddClick}
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -113,7 +113,7 @@
     {:else}
       {#each todos as todo (todo.id)}
         <div
-          on:dragstart={(e) => {
+          ondragstart={(e) => {
             e.dataTransfer?.setData('todo-id', todo.id);
             e.dataTransfer!.effectAllowed = 'move';
           }}
