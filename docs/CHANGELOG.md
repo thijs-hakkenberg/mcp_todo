@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automatic Migration** (14 tests): Zero data loss migration from legacy format
   - Detects legacy `todos.json` on startup
   - Creates `todos.json.backup` before migration
-  - Converts all todos to directory structure
+  - Converts all todos to the directory structure
   - Rebuilds all symlink views
   - Atomic Git commit of migration
   - Zero data loss guaranteed
@@ -70,12 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SyncManager** (2 new tests): Directory-aware sync operations
   - Removed hardcoded `todos.json` references
   - Automatic file type detection (task.json, README.md, legacy)
-  - Works transparently with directory structure
+  - Works transparently with the directory structure
   - Conflict resolution for any conflicted file
 
 #### Integration & Performance (Phases 8-9)
 - **Integration Tests** (20 tests): End-to-end validation
-  - Full CRUD cycle with real file system
+  - Full CRUD cycle with a real file system
   - Concurrent operation handling
   - Symlink consistency verification
   - Git integration testing
@@ -83,14 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Performance Benchmarks** (18 tests): Comprehensive performance validation
   - Load 1000 tasks: **0ms** (target: <500ms) - **500x better** ⚡
-  - Write single task: **1ms** (target: <100ms) - **100x better**
+  - Write a single task: **1ms** (target: <100ms) - **100x better**
   - Update task: **1ms** (target: <100ms) - **100x better**
   - Delete task: **1ms** (target: <100ms) - **100x better**
   - List by filter: **0ms** (target: <50ms) - **Instant**
   - Search 1000 todos: **0ms** (target: <100ms) - **Instant**
   - Create symlinks: **1ms** (target: <50ms) - **50x better**
   - Rebuild 1000 symlinks: **647ms** (target: <5000ms) - **8x better**
-  - Batch create 100: **68ms** (target: <10000ms) - **147x better**
+  - Batch creates 100: **68ms** (target: <10000ms) - **147x better**
 
 #### Documentation (Phase 10)
 - **Updated README.md**: Directory structure documentation, migration info
@@ -128,9 +128,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Git Initialization Messages**: More accurate status messages
-  - "Creating new Git repository..." when initializing new repo
+  - "Creating a new Git repository..." when initializing new repo
   - "Loading existing Git repository..." when opening existing repo
-  - Removed redundant "Initializing..." message
+  - Removed a redundant "Initializing..." message
 
 - **MCP Client Error Handling**: More robust stdout parsing
   - Skips non-JSON lines gracefully
@@ -146,7 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **No Todos Displayed**: Fixed web frontend not loading todos
   - Root cause: API server wasn't loading .env file
   - Solution: Added dotenv.config() to both MCP and API servers
-  - Todos now load correctly from directory structure
+  - Todos now loads correctly from the directory structure
 
 - **Shutdown Hanging**: Fixed API server not exiting on Ctrl+C
   - Moved signal handlers to startServer() for proper cleanup

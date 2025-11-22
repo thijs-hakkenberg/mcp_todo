@@ -297,3 +297,104 @@ test.describe('Responsive Design Tests', () => {
     await expect(page.locator('.kanban-board')).toBeVisible();
   });
 });
+
+test.describe('DaVinci Resolve Design System Screenshots', () => {
+  test('should capture full kanban board with dark theme', async ({ page }) => {
+    // Set desktop viewport for best screenshot
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/');
+
+    // Wait for board to fully load
+    await page.waitForSelector('.kanban-board');
+    await page.waitForTimeout(1000); // Allow animations to settle
+
+    // Take full page screenshot
+    await page.screenshot({
+      path: 'screenshots/kanban-board-dark-theme.png',
+      fullPage: true
+    });
+
+    // Verify the board is visible
+    await expect(page.locator('.kanban-board')).toBeVisible();
+  });
+
+  test('should capture theme toggle states', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/');
+    await page.waitForSelector('.kanban-board');
+    await page.waitForTimeout(500);
+
+    // Capture default theme
+    await page.screenshot({
+      path: 'screenshots/theme-default.png',
+      fullPage: false
+    });
+
+    // Toggle theme and capture
+    const themeButton = page.getByRole('button', { name: /Dark|Light|System/ });
+    if (await themeButton.count() > 0) {
+      await themeButton.click();
+      await page.waitForTimeout(500);
+
+      await page.screenshot({
+        path: 'screenshots/theme-toggled.png',
+        fullPage: false
+      });
+    }
+  });
+
+  test('should capture todo card details with DaVinci colors', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/');
+    await page.waitForSelector('.kanban-board');
+
+    // Find and open a todo detail modal
+    const todoCard = page.locator('.todo-card').first();
+    if (await todoCard.count() > 0) {
+      await todoCard.dblclick();
+      await page.waitForSelector('.todo-modal');
+      await page.waitForTimeout(300);
+
+      await page.screenshot({
+        path: 'screenshots/todo-detail-modal.png',
+        fullPage: false
+      });
+
+      // Close modal
+      await page.getByRole('button', { name: 'Close' }).click();
+    }
+  });
+
+  test('should capture add todo modal', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/');
+    await page.waitForSelector('.kanban-board');
+
+    // Open add modal
+    const addButton = page.locator('.add-todo-button').first();
+    await addButton.click();
+    await page.waitForSelector('.add-todo-modal');
+    await page.waitForTimeout(300);
+
+    await page.screenshot({
+      path: 'screenshots/add-todo-modal.png',
+      fullPage: false
+    });
+  });
+
+  test('should capture filter bar with all options', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/');
+    await page.waitForSelector('.kanban-board');
+
+    // Apply some filters to show active state
+    await page.locator('#searchInput').fill('test');
+    await page.waitForTimeout(300);
+
+    // Capture just the filter area
+    const filterBar = page.locator('.border-b').first();
+    await filterBar.screenshot({
+      path: 'screenshots/filter-bar-active.png'
+    });
+  });
+});

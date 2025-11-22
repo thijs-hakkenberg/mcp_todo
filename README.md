@@ -134,7 +134,7 @@ cp .env.example .env
 ./start-frontend.sh
 ```
 
-Then open http://localhost:5173 in your browser.
+Then open http://localhost:31415 in your browser.
 
 **Note**: The startup scripts will use default values if environment variables are not set, but it's recommended to configure `.env` with your actual repository path.
 
@@ -212,7 +212,7 @@ cd web
 npm run dev
 ```
 
-5. Open your browser to `http://localhost:5173`
+5. Open your browser to `http://localhost:31415`
 
 ### Environment Variables for API Server
 
@@ -223,7 +223,7 @@ The API server uses the **same environment variables** as Claude Desktop/Claude 
 - `GIT_USER_NAME`: Git user name for commits
 - `GIT_USER_EMAIL`: Git user email for commits
 - `PORT`: API server port (default: 3001)
-- `CORS_ORIGIN`: CORS origin for web frontend (default: `http://localhost:5173`)
+- `CORS_ORIGIN`: CORS origin for web frontend (default: `http://localhost:31415`)
 - `NODE_ENV`: Environment mode (development/production)
 
 ### Development Mode
@@ -541,7 +541,7 @@ Current test coverage: ~94%
 
 **Port already in use**
 - Change the port: `PORT=3002 npm run start:api`
-- Update CORS_ORIGIN if needed: `CORS_ORIGIN=http://localhost:5173`
+- Update CORS_ORIGIN if needed: `CORS_ORIGIN=http://localhost:31415`
 - Kill the process using the port: `lsof -ti:3001 | xargs kill`
 
 **Todos not syncing between interfaces**
