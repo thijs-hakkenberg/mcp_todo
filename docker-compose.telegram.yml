@@ -1,0 +1,21 @@
+services:
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.telegram
+    container_name: todo-telegram-bot
+    restart: unless-stopped
+    volumes:
+      - telegram-git-data:/app/data
+    env_file:
+      - path: .env.telegram
+        required: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  telegram-git-data:
+    name: todo-telegram-git-data

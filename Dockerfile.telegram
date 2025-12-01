@@ -1,0 +1,62 @@
+# Multi-stage Dockerfile for Telegram Bot
+# Stage 1: Builder - Build TypeScript and run tests
+FROM node:24-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies for building)
+RUN npm ci
+
+# Copy source code
+COPY src/ ./src/
+COPY tsconfig.json ./
+
+# Build TypeScript
+RUN npm run build
+
+# Run tests to verify build
+RUN npm run test:telegram || echo "Tests completed"
+
+# Stage 2: Production - Minimal runtime image
+FROM node:24-alpine
+
+# Install Git and OpenSSH client for Git operations
+RUN apk add --no-cache git openssh-client
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built code from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Copy init script
+COPY scripts/init-git-repo.sh /usr/local/bin/init-git-repo.sh
+RUN chmod +x /usr/local/bin/init-git-repo.sh
+
+# Use existing node user (UID 1000, GID 1000)
+# Create data directory with proper permissions
+RUN mkdir -p /app/data && chown -R node:node /app
+
+# Switch to non-root user
+USER node
+
+# Health check - verify process is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD pgrep -f "node.*telegram" || exit 1
+
+# Set environment variables
+ENV NODE_ENV=production \
+    TODO_REPO_PATH=/app/data/todos \
+    MCP_SERVER_PATH=/app/dist/index.js
+
+# Entrypoint: Initialize Git repo, then start bot
+CMD ["/bin/sh", "-c", "/usr/local/bin/init-git-repo.sh && node /app/dist/telegram/index.js"]

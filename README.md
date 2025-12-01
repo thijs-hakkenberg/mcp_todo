@@ -11,6 +11,7 @@ A Model Context Protocol (MCP) server that uses Git as the backend for a collabo
 - **Rich Todo Features**: Priority levels, projects, tags, assignees, due dates, comments, and more
 - **MCP Integration**: Works seamlessly with Claude Desktop and Claude Code
 - **Web-Based Kanban Board**: Interactive Svelte 5 UI with drag-and-drop, filtering, and real-time updates
+- **Telegram Bot**: Manage todos via Telegram group chats with command-based interface
 
 ## Architecture
 
@@ -24,9 +25,15 @@ Claude Desktop ←→ MCP Server (Node.js) ←→ Local Git Repo ←→ Remote G
 Web Browser (Svelte) ←→ API Server (Express) ←→ MCP Server (Node.js) ←→ Local Git Repo ←→ Remote Git
 ```
 
-The system provides two interfaces:
+### Telegram Bot
+```
+Telegram User ←→ Telegram Bot API ←→ TodoBot (Node.js) ←→ MCP Server (stdio) ←→ Local Git Repo ←→ Remote Git
+```
+
+The system provides three interfaces:
 1. **MCP Interface**: Direct integration with Claude Desktop and Claude Code via stdio
 2. **Web Interface**: Browser-based kanban board via REST API
+3. **Telegram Bot**: Command-based todo management in Telegram group chats
 
 ## Installation
 
@@ -225,6 +232,29 @@ The API server uses the **same environment variables** as Claude Desktop/Claude 
 - `PORT`: API server port (default: 3001)
 - `CORS_ORIGIN`: CORS origin for web frontend (default: `http://localhost:31415`)
 - `NODE_ENV`: Environment mode (development/production)
+
+### Running with Docker
+
+The Telegram bot can be deployed using Docker for improved reliability and easier management. Docker provides automatic restarts, isolated environments, and simplified deployment.
+
+**Quick Start**:
+
+```bash
+# 1. Create environment file
+cp .env.telegram.example .env.telegram
+
+# 2. Edit with your configuration
+nano .env.telegram
+
+# 3. Build and start
+docker build -f Dockerfile.telegram -t todo-telegram-bot:latest .
+docker compose -f docker-compose.telegram.yml up -d
+
+# 4. View logs
+docker logs -f todo-telegram-bot
+```
+
+For detailed Docker deployment instructions, troubleshooting, and production setup, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
 
 ### Development Mode
 

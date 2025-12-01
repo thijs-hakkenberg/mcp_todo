@@ -11,6 +11,7 @@ coverage/
 .env
 .env.local
 .env.*.local
+.env.telegram
 
 # IDE files
 .vscode/
@@ -57,3 +58,7 @@ Thumbs.db
 
 # Optional REPL history
 .node_repl_history
+
+# Docker
+docker-compose.override.yml
+telegram-data-backup.tar.gz

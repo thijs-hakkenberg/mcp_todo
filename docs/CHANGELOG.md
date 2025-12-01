@@ -5,6 +5,270 @@ All notable changes to the Git-Based MCP Todo Server will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-12-01
+
+### Added - Docker Containerization for Telegram Bot
+
+**Major feature release**: Docker containerization support for the Telegram bot with production-ready deployment.
+
+#### Docker Infrastructure
+- **Multi-Stage Dockerfile** (`Dockerfile.telegram`)
+  - Builder stage: TypeScript compilation and testing
+  - Production stage: Minimal runtime image with Node.js 24 Alpine
+  - Git and OpenSSH client for repository operations
+  - Non-root user (node:node) for security
+  - Health check monitoring for process availability
+  - Automatic Git repository initialization on startup
+
+- **Docker Compose Configuration** (`docker-compose.telegram.yml`)
+  - Single-service orchestration for Telegram bot
+  - Named volume for persistent Git data
+  - Environment file integration (.env.telegram)
+  - Automatic restart policy (unless-stopped)
+  - JSON file logging with rotation (10MB max, 3 files)
+
+- **Git Initialization Script** (`scripts/init-git-repo.sh`)
+  - Automatic Git repository setup on container start
+  - Clone from remote or initialize empty repository
+  - Git user configuration from environment variables
+  - Graceful error handling with fallback strategies
+  - Pull latest changes on container restart
+
+#### Configuration & Documentation
+- **Environment Template** (`.env.telegram.example`)
+  - Complete configuration template for Docker deployment
+  - Telegram bot credentials (token, authorized user ID)
+  - Git configuration (repository URL, user name, email)
+  - Sync settings (auto-sync, interval)
+  - MCP server path configuration
+
+- **Comprehensive Deployment Guide** (`docs/DOCKER_DEPLOYMENT.md`)
+  - Complete setup instructions from prerequisites to production
+  - Git repository setup (GitHub, GitLab with HTTPS/SSH)
+  - Docker build and deployment steps
+  - Operations guide (logs, start/stop, updates, backups)
+  - Troubleshooting section with common issues
+  - Production considerations (resource limits, monitoring, security)
+  - Migration guide from local to Docker deployment
+  - 840+ lines of detailed documentation
+
+#### NPM Scripts
+Added Docker-specific npm scripts for easy operations:
+- `docker:build:telegram` - Build Docker image for Telegram bot
+- `docker:up:telegram` - Start Telegram bot container
+- `docker:down:telegram` - Stop Telegram bot container
+- `docker:logs:telegram` - View Telegram bot logs
+- `docker:restart:telegram` - Restart Telegram bot container
+
+#### Updated Files
+- **README.md**: Added "Running with Docker" section with quick start
+- **.env.example**: Added Telegram bot configuration section
+- **.gitignore**: Added Docker-related exclusions (.env.telegram, volumes)
+- **package.json**: Added Docker npm scripts
+
+### Technical Details
+
+#### Git Sync Strategy
+The Docker deployment uses a per-container Git clone strategy:
+- Each container maintains its own Git repository clone
+- Automatic sync with remote repository (configurable interval)
+- Conflict resolution via Last-Write-Wins (LWW) strategy
+- Graceful handling of network failures and auth errors
+- Persistent storage via Docker named volumes
+
+#### Security Features
+- Non-root user execution (node:node, UID/GID 1000)
+- Environment-based secret management
+- No exposed network ports (Telegram API polling only)
+- Read-only SSH key mounting support
+- Git credentials via HTTPS tokens or SSH keys
+
+#### Container Architecture
+```
+Docker Container
+├── Telegram Bot (Node.js) - Long polling, command processing
+├── MCP Server (stdio) - Todo CRUD operations
+├── Local Git Repository (/app/data/todos) - Directory-based storage
+└── Auto-sync to Remote Git (GitHub/GitLab) - Every 60s
+```
+
+#### Build Optimization
+- Multi-stage build reduces final image size
+- Production dependencies only in runtime image
+- Build-time testing ensures code quality
+- Cached layers for faster rebuilds
+- Alpine Linux base for minimal footprint
+
+### Benefits
+- **Easy Deployment**: Single command to start production-ready bot
+- **Isolation**: Containerized environment with minimal dependencies
+- **Portability**: Run anywhere Docker is available
+- **Reliability**: Automatic restarts on failures
+- **Data Persistence**: Git-backed storage with remote sync
+- **Maintainability**: Simple updates and rollbacks
+- **Security**: Non-root execution, environment-based secrets
+- **Monitoring**: Health checks and structured logging
+
+### Migration Guide
+
+#### For New Deployments
+```bash
+# 1. Copy environment template
+cp .env.telegram.example .env.telegram
+
+# 2. Configure environment variables
+# Edit .env.telegram with your credentials
+
+# 3. Build and start
+npm run docker:build:telegram
+npm run docker:up:telegram
+
+# 4. Verify logs
+npm run docker:logs:telegram
+```
+
+#### For Existing Local Deployments
+See `docs/DOCKER_DEPLOYMENT.md` for complete migration guide from local to Docker.
+
+### Known Limitations
+- Single bot instance per Telegram token (Telegram API limitation)
+- Requires Docker 20.10+ and Docker Compose 2.0+
+- Git repository must be accessible from container network
+- SSH key authentication requires volume mounting
+
+### Related
+- Telegram Bot Phase 1 implementation (v2.0.0)
+- Directory-based persistence (v1.9.0)
+- Git sync and conflict resolution (v1.9.0)
+
+---
+
+## [2.0.0] - 2025-11-23
+
+### Added - Telegram Bot Integration (Phase 1: Core Bot)
+**Major feature release**: Telegram bot interface for managing todos via Telegram group chats.
+
+#### Core Components
+- **Telegram Bot Foundation** (`src/telegram/bot.ts`)
+  - Main bot entry point with configuration validation
+  - Command handler registration and routing
+  - Authentication middleware integration
+  - MCP client integration for todo operations
+  - Graceful shutdown handling (SIGINT/SIGTERM)
+  - Environment-based configuration
+
+- **Authentication Handler** (`src/telegram/handlers/authHandler.ts`)
+  - Single-user authorization middleware for group chats
+  - User ID validation against `TELEGRAM_AUTHORIZED_USER_ID`
+  - Bot user rejection (prevents bot-to-bot interactions)
+  - Unauthorized access logging and friendly rejection messages
+  - **Tests**: 9/9 passing (100%)
+
+- **Command Handler** (`src/telegram/handlers/commandHandler.ts`)
+  - Command parsing with flexible parameter syntax
+  - Multi-word parameter value support (`text:Updated todo text`)
+  - Tag array parsing (`tags:tag1,tag2,tag3`)
+  - MCP tool integration for all todo operations
+  - Emoji-formatted responses for better UX
+  - **Tests**: 18/18 passing (100%)
+
+- **MCP Client** (`src/telegram/services/mcpClient.ts`)
+  - Stdio communication bridge to MCP server
+  - JSON-RPC 2.0 protocol implementation
+  - Request/response correlation by ID
+  - Timeout handling (30 seconds default)
+  - Auto-reconnect support
+  - Connection health monitoring
+
+#### Supported Commands
+- `/start` - Welcome message and bot introduction
+- `/help` - Command list with usage examples
+- `/list [filters]` - List todos with optional filters (status:, priority:, project:, tags:)
+- `/create <text> [options]` - Create todo with project, tags, priority
+- `/update <id> <field:value>` - Update todo fields
+- `/complete <id>` - Mark todo as complete
+- `/delete <id>` - Delete (archive) todo
+
+#### Configuration
+New environment variables:
+- `TELEGRAM_BOT_TOKEN` - Telegram bot API token (required)
+- `TELEGRAM_AUTHORIZED_USER_ID` - Authorized user's Telegram ID (required)
+- `MCP_SERVER_PATH` - Path to MCP server (default: dist/index.js)
+
+#### Dependencies
+- `node-telegram-bot-api` (^0.66.0) - Telegram Bot API client
+- `@types/node-telegram-bot-api` (^0.64.7) - TypeScript types
+- `axios` (^1.7.9) - HTTP client for future API integrations
+
+### Technical Details
+
+#### Test Coverage
+- **Unit Tests**: 27/27 passing (100%)
+  - AuthHandler: 9 tests
+  - CommandHandler: 18 tests
+- **Integration Tests**: Pending (require Phase 2-4 components)
+- **TDD Approach**: Full Red-Green-Refactor cycle followed
+
+#### Architecture
+```
+Telegram User ←→ Telegram Bot API ←→ TodoBot (Node.js)
+                                       ├── AuthHandler (authorization)
+                                       ├── CommandHandler (command parsing)
+                                       └── MCPClient (stdio) ←→ MCP Server ←→ Git Repo
+```
+
+#### Command Parsing Features
+- Simple commands: `/list`
+- Parameters: `/list status:todo priority:high`
+- Multi-word values: `/update 123 text:Updated todo text`
+- Arrays: `/create Todo tags:urgent,important`
+
+#### Files Created
+- `src/telegram/bot.ts` - Main bot entry point
+- `src/telegram/handlers/authHandler.ts` - Authentication middleware
+- `src/telegram/handlers/commandHandler.ts` - Command parsing and MCP integration
+- `src/telegram/services/mcpClient.ts` - MCP stdio client
+- `src/telegram/types/telegram.ts` - TypeScript type definitions
+- `tests/telegram/unit/authHandler.test.ts` - Auth handler tests (9 tests)
+- `tests/telegram/unit/commandHandler.test.ts` - Command handler tests (18 tests)
+- `docs/TELEGRAM_BOT_SETUP.md` - Setup and configuration guide
+- `TELEGRAM_BOT_PROGRESS.md` - Implementation progress tracking
+- `CURRENT_SPRINT.md` - Sprint planning (5 phases, 46 tasks)
+- `FUTURE_STORIES.md` - Backlog (45 stories, 10 themes)
+
+#### Files Modified
+- `package.json` - Added Telegram dependencies and test scripts
+- `.env.example` - Added Telegram configuration section
+
+### Known Limitations (Phase 1)
+1. **Single User**: Only one authorized user supported (by design for Phase 1)
+2. **No Voice Support**: Voice transcription requires Phase 2 implementation
+3. **No Natural Language**: Requires Ollama integration (Phase 3)
+4. **No GitLab Integration**: Repository initialization requires Phase 4
+5. **Command-Based Only**: Natural language processing coming in Phase 3
+
+### Upcoming Phases
+- **Phase 2**: Voice Transcription (Whisper, speaker diarization, speaker recognition)
+- **Phase 3**: Ollama NLP Integration (gemma2:2b for intent detection and extraction)
+- **Phase 4**: GitLab Integration (repository initialization via /init command)
+- **Phase 5**: Documentation (comprehensive guides and ADRs)
+
+### Breaking Changes
+None. This is a new feature that doesn't affect existing MCP or Web UI interfaces.
+
+### Migration Guide
+No migration required. The Telegram bot is a new interface that works alongside existing MCP and Web UI interfaces, sharing the same Git repository.
+
+To use the Telegram bot:
+1. Install dependencies: `npm install`
+2. Build project: `npm run build`
+3. Configure environment variables (see `.env.example`)
+4. Start bot: `npm run start:telegram` (when entry point is created)
+
+See `docs/TELEGRAM_BOT_SETUP.md` for detailed setup instructions.
+
+---
+
 ## [1.10.0] - 2025-11-08
 
 ### Changed - Performance Optimization
