@@ -137,9 +137,6 @@ export class TodoRepository {
     // Update in-memory cache
     this.todos.push(todo);
 
-    // Reload cache from disk to ensure consistency across processes
-    await this.loadTodos();
-
     return todo;
   }
 
@@ -172,9 +169,6 @@ export class TodoRepository {
         // Update in-memory cache
         this.todos.push(todo);
       }
-
-      // Reload cache from disk to ensure consistency across processes
-      await this.loadTodos();
 
       return createdTodos;
     } catch (error) {
@@ -212,9 +206,6 @@ export class TodoRepository {
 
     // Update in-memory cache
     this.todos[index] = updatedTodo;
-
-    // Reload cache from disk to ensure consistency across processes
-    await this.loadTodos();
 
     return updatedTodo;
   }
@@ -437,9 +428,6 @@ export class TodoRepository {
       // Update in-memory cache
       this.todos[index] = archivedTodo;
     }
-
-    // Reload cache from disk to ensure consistency across processes
-    await this.loadTodos();
   }
 
   /**

@@ -181,7 +181,7 @@ describe.skip('MCP Client (Jest worker crashes - needs investigation)', () => {
     it('should timeout requests after specified duration', async () => {
       jest.useFakeTimers();
 
-      const promise = mcpClient.sendRequest('slow_method', {}, { timeout: 5000 });
+      const promise = mcpClient.sendRequest('slow_method', {}, 5000);
 
       // Advance time past timeout
       jest.advanceTimersByTime(5001);

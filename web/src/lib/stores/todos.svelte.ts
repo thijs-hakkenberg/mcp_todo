@@ -74,20 +74,24 @@ export function createTodoStore() {
   });
 
   const columnTodos = $derived.by(() => {
-    const filtered = filteredTodos;
+    // Sort once, then partition into columns (more efficient than sorting 4 times)
+    const sorted = [...filteredTodos].sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
-    // Sort by creation date (newest first)
-    const sortByDate = (todos: Todo[]) =>
-      [...todos].sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-    return {
-      'todo': sortByDate(filtered.filter(t => t.status === 'todo')),
-      'in-progress': sortByDate(filtered.filter(t => t.status === 'in-progress')),
-      'blocked': sortByDate(filtered.filter(t => t.status === 'blocked')),
-      'done': sortByDate(filtered.filter(t => t.status === 'done'))
+    // Partition into columns in a single pass
+    const columns: Record<Todo['status'], Todo[]> = {
+      'todo': [],
+      'in-progress': [],
+      'blocked': [],
+      'done': []
     };
+
+    for (const todo of sorted) {
+      columns[todo.status].push(todo);
+    }
+
+    return columns;
   });
 
   const statistics = $derived.by(() => {
@@ -322,10 +326,6 @@ export function createTodoStore() {
     filters.projects = projects;
   }
 
-  function setProjectFilter(projects: string[]): void {
-    filters.projects = projects;
-  }
-
   function setPriorityFilter(priority: string): void {
     filters.priority = priority;
   }
@@ -400,7 +400,6 @@ export function createTodoStore() {
     addComment,
     setSearchFilter,
     setProjectsFilter,
-    setProjectFilter,
     setPriorityFilter,
     setTagsFilter,
     setAssigneeFilter,

@@ -191,7 +191,7 @@ describe('MCPClient Integration', () => {
     it('should handle timeout errors', async () => {
       const result = await mcpClient.callTool('create_todo', {
         text: 'Test'
-      }, { timeout: 1 }); // 1ms timeout
+      }, 1); // 1ms timeout
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('timeout');

@@ -5,6 +5,151 @@ All notable changes to the Git-Based MCP Todo Server will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-01-19
+
+### Changed - Major Codebase Refactoring
+
+**Major refactoring release**: Comprehensive code consolidation, security improvements, and performance optimizations following a detailed code review.
+
+#### MCP Client Consolidation (ADR-003)
+- **Created shared base class** (`src/shared/mcpClient.ts`)
+  - Abstract `BaseMCPClient` class with JSON-RPC communication logic
+  - Shared types in `src/shared/types.ts` (JSONRPCRequest, SpawnOptions, MCPToolResult, etc.)
+  - Eliminates ~450 lines of duplicated code between API and Telegram clients
+- **Refactored API MCP Client** (`src/api/mcpClient.ts`)
+  - Reduced from 265 lines to 32 lines (88% reduction)
+  - Now extends BaseMCPClient with environment-specific spawn options
+- **Refactored Telegram MCP Client** (`src/telegram/services/mcpClient.ts`)
+  - Reduced from 323 lines to 183 lines (43% reduction)
+  - Maintains auto-reconnect functionality while using shared base
+
+#### MCPServer Modularization
+- **Extracted tool definitions** to `src/server/tools/definitions.ts`
+  - All 18 MCP tool schemas in dedicated module
+  - Cleaner separation of concerns
+- **Extracted handlers** to `src/server/handlers/`
+  - `todoHandlers.ts` - CRUD operations (create, read, update, delete, complete, comment)
+  - `filterHandlers.ts` - Filter options (projects, tags, assignees, priorities)
+  - `syncHandlers.ts` - Git sync and history operations
+- **Reduced MCPServer.ts** from 901 lines to 92 lines (90% reduction)
+  - Now acts as thin orchestrator routing to appropriate handlers
+  - Much easier to maintain and extend
+
+#### Frontend Component Split
+- **Extracted modal components** from KanbanBoard.svelte
+  - `web/src/lib/components/modals/TodoDetailModal.svelte` - View todo details
+  - `web/src/lib/components/modals/TodoAddModal.svelte` - Create new todo
+  - `web/src/lib/components/modals/TodoEditModal.svelte` - Edit existing todo
+- **Reduced KanbanBoard.svelte** from 567 lines to 211 lines (63% reduction)
+  - Board now focused on layout and column management only
+
+### Added - Security Improvements
+
+#### UUID Validation
+- **Added UUID validation middleware** to API routes (`src/api/routes/todos.ts`)
+  - All routes with `:id` parameter now validate UUID format
+  - Returns 400 error for invalid IDs before processing
+  - Prevents potential injection attacks
+
+#### XSS Prevention
+- **Added DOMPurify sanitization** for markdown rendering
+  - Installed `dompurify` and `@types/dompurify` packages
+  - Markdown content sanitized before rendering in KanbanBoard
+  - Prevents XSS attacks via todo descriptions
+
+### Fixed - Dead Code and Legacy References
+
+#### Removed Dead Code
+- **Deleted** `web/src/lib/Counter.svelte` (unused Vite template file)
+- **Removed** duplicate `setProjectFilter` function from todos store
+  - Kept `setProjectsFilter` (plural) for multi-select functionality
+
+#### Fixed Legacy References
+- **Fixed hardcoded path** in `src/api/mcpClient.ts`
+  - Changed from `/Users/thijshakkenberg/our_todo/todos` to `path.join(os.homedir(), 'my-todos')`
+  - Now consistent with `src/index.ts` default
+- **Updated get_history tool** to reference `tasks/` instead of `todos.json`
+  - Aligns with directory-based persistence (v1.9.0)
+
+### Improved - Performance Optimizations
+
+#### Reduced Cache Reloads
+- **Removed 4 redundant `loadTodos()` calls** from TodoRepository
+  - After `create()`, `createBatch()`, `update()`, and `delete()`
+  - In-memory cache already updated by these operations
+  - Reduces unnecessary file system reads
+
+#### Optimized Column Sorting
+- **Improved `columnTodos` derived state** in todos store
+  - Previous: Sorted todos 4 times (once per column)
+  - New: Sort once, then partition into columns
+  - More efficient for large todo lists
+
+### Technical Details
+
+#### New Files Created
+```
+src/shared/
+├── types.ts           # Shared JSON-RPC and MCP types
+├── mcpClient.ts       # BaseMCPClient abstract class
+└── index.ts           # Module exports
+
+src/server/
+├── tools/
+│   ├── definitions.ts # Tool schema definitions
+│   └── index.ts
+├── handlers/
+│   ├── todoHandlers.ts
+│   ├── filterHandlers.ts
+│   ├── syncHandlers.ts
+│   └── index.ts
+└── utils/
+    └── response.ts    # Response formatting utilities
+
+web/src/lib/components/modals/
+├── TodoDetailModal.svelte
+├── TodoAddModal.svelte
+└── TodoEditModal.svelte
+```
+
+#### Files Modified
+- `src/api/mcpClient.ts` - Refactored to use BaseMCPClient
+- `src/telegram/services/mcpClient.ts` - Refactored to use BaseMCPClient
+- `src/server/MCPServer.ts` - Slim orchestrator using extracted modules
+- `src/api/routes/todos.ts` - Added UUID validation middleware
+- `src/data/TodoRepository.ts` - Removed redundant loadTodos() calls
+- `web/src/lib/stores/todos.svelte.ts` - Optimized sorting, removed duplicate function
+- `web/src/lib/components/KanbanBoard.svelte` - Added DOMPurify, extracted modals
+
+#### Test Results
+- **API Route Tests**: 22/22 passing
+- **Frontend Tests**: 49/49 passing
+- **Backend Tests**: 325+ passing
+- **Build**: Successful
+
+### Code Reduction Summary
+
+| Component | Before | After | Reduction |
+|-----------|--------|-------|-----------|
+| API MCP Client | 265 lines | 32 lines | 88% |
+| Telegram MCP Client | 323 lines | 183 lines | 43% |
+| MCPServer.ts | 901 lines | 92 lines | 90% |
+| KanbanBoard.svelte | 567 lines | 211 lines | 63% |
+| **Total Eliminated** | | | ~1,250 lines |
+
+### Breaking Changes
+None. All changes are internal refactoring with maintained API compatibility.
+
+### Migration Guide
+No migration required. This release is backward compatible.
+
+### Related
+- ADR-003: MCP Client Consolidation and Codebase Refactoring
+- Security improvements address OWASP Top 10 concerns
+- Performance optimizations benefit large todo repositories
+
+---
+
 ## [2.1.0] - 2025-12-01
 
 ### Added - Docker Containerization for Telegram Bot

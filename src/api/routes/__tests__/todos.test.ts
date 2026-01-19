@@ -6,6 +6,11 @@ import { MCPClient } from '../../mcpClient';
 // Mock MCP Client
 jest.mock('../../mcpClient');
 
+// Test UUIDs
+const TEST_UUID_1 = '00000000-0000-0000-0000-000000000001';
+const TEST_UUID_2 = '00000000-0000-0000-0000-000000000002';
+const TEST_UUID_3 = '00000000-0000-0000-0000-000000000003';
+
 describe('Todo Routes', () => {
   let app: express.Application;
   let mockMCPClient: jest.Mocked<MCPClient>;
@@ -98,7 +103,7 @@ describe('Todo Routes', () => {
 
   describe('GET /api/todos/:id', () => {
     it('should return a single todo', async () => {
-      const mockTodo = { id: '123', text: 'Test todo', status: 'todo' };
+      const mockTodo = { id: TEST_UUID_1, text: 'Test todo', status: 'todo' };
 
       mockMCPClient.callTool.mockResolvedValue({
         success: true,
@@ -106,14 +111,14 @@ describe('Todo Routes', () => {
       });
 
       const response = await request(app)
-        .get('/api/todos/123');
+        .get(`/api/todos/${TEST_UUID_1}`);
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
         success: true,
         todo: mockTodo
       });
-      expect(mockMCPClient.callTool).toHaveBeenCalledWith('get_todo', { id: '123' });
+      expect(mockMCPClient.callTool).toHaveBeenCalledWith('get_todo', { id: TEST_UUID_1 });
     });
 
     it('should handle todo not found', async () => {
@@ -123,7 +128,7 @@ describe('Todo Routes', () => {
       });
 
       const response = await request(app)
-        .get('/api/todos/nonexistent');
+        .get('/api/todos/99999999-9999-9999-9999-999999999999');
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
@@ -141,7 +146,7 @@ describe('Todo Routes', () => {
       };
 
       const createdTodo = {
-        id: '456',
+        id: TEST_UUID_2,
         ...newTodo,
         status: 'todo',
         createdAt: new Date().toISOString()
@@ -201,7 +206,7 @@ describe('Todo Routes', () => {
       };
 
       const updatedTodo = {
-        id: '789',
+        id: TEST_UUID_3,
         ...updates,
         modifiedAt: new Date().toISOString()
       };
@@ -212,7 +217,7 @@ describe('Todo Routes', () => {
       });
 
       const response = await request(app)
-        .put('/api/todos/789')
+        .put(`/api/todos/${TEST_UUID_3}`)
         .send(updates);
 
       expect(response.status).toBe(200);
@@ -221,7 +226,7 @@ describe('Todo Routes', () => {
         todo: updatedTodo
       });
       expect(mockMCPClient.callTool).toHaveBeenCalledWith('update_todo', {
-        id: '789',
+        id: TEST_UUID_3,
         ...updates
       });
     });
@@ -233,7 +238,7 @@ describe('Todo Routes', () => {
       });
 
       const response = await request(app)
-        .put('/api/todos/nonexistent')
+        .put('/api/todos/99999999-9999-9999-9999-999999999999')
         .send({ text: 'Updated' });
 
       expect(response.status).toBe(404);
@@ -247,23 +252,23 @@ describe('Todo Routes', () => {
     it('should update todo status', async () => {
       mockMCPClient.callTool.mockResolvedValue({
         success: true,
-        todo: { id: '123', status: 'done' }
+        todo: { id: TEST_UUID_1, status: 'done' }
       });
 
       const response = await request(app)
-        .patch('/api/todos/123/status')
+        .patch(`/api/todos/${TEST_UUID_1}/status`)
         .send({ status: 'done' });
 
       expect(response.status).toBe(200);
       expect(mockMCPClient.callTool).toHaveBeenCalledWith('update_todo', {
-        id: '123',
+        id: TEST_UUID_1,
         status: 'done'
       });
     });
 
     it('should validate status value', async () => {
       const response = await request(app)
-        .patch('/api/todos/123/status')
+        .patch(`/api/todos/${TEST_UUID_1}/status`)
         .send({ status: 'invalid' });
 
       expect(response.status).toBe(400);
@@ -281,14 +286,14 @@ describe('Todo Routes', () => {
       });
 
       const response = await request(app)
-        .delete('/api/todos/123');
+        .delete(`/api/todos/${TEST_UUID_1}`);
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
         success: true,
         message: 'Todo deleted successfully'
       });
-      expect(mockMCPClient.callTool).toHaveBeenCalledWith('delete_todo', { id: '123' });
+      expect(mockMCPClient.callTool).toHaveBeenCalledWith('delete_todo', { id: TEST_UUID_1 });
     });
 
     it('should handle deletion errors', async () => {
@@ -298,7 +303,7 @@ describe('Todo Routes', () => {
       });
 
       const response = await request(app)
-        .delete('/api/todos/nonexistent');
+        .delete('/api/todos/99999999-9999-9999-9999-999999999999');
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
@@ -311,14 +316,14 @@ describe('Todo Routes', () => {
     it('should mark todo as complete', async () => {
       mockMCPClient.callTool.mockResolvedValue({
         success: true,
-        todo: { id: '123', status: 'done', completedAt: new Date().toISOString() }
+        todo: { id: TEST_UUID_1, status: 'done', completedAt: new Date().toISOString() }
       });
 
       const response = await request(app)
-        .post('/api/todos/123/complete');
+        .post(`/api/todos/${TEST_UUID_1}/complete`);
 
       expect(response.status).toBe(200);
-      expect(mockMCPClient.callTool).toHaveBeenCalledWith('complete_todo', { id: '123' });
+      expect(mockMCPClient.callTool).toHaveBeenCalledWith('complete_todo', { id: TEST_UUID_1 });
     });
   });
 
@@ -328,23 +333,23 @@ describe('Todo Routes', () => {
 
       mockMCPClient.callTool.mockResolvedValue({
         success: true,
-        todo: { id: '123', comments: [comment] }
+        todo: { id: TEST_UUID_1, comments: [comment] }
       });
 
       const response = await request(app)
-        .post('/api/todos/123/comment')
+        .post(`/api/todos/${TEST_UUID_1}/comment`)
         .send(comment);
 
       expect(response.status).toBe(200);
       expect(mockMCPClient.callTool).toHaveBeenCalledWith('add_comment', {
-        id: '123',
+        id: TEST_UUID_1,
         comment: 'This is a test comment'
       });
     });
 
     it('should validate comment is provided', async () => {
       const response = await request(app)
-        .post('/api/todos/123/comment')
+        .post(`/api/todos/${TEST_UUID_1}/comment`)
         .send({});
 
       expect(response.status).toBe(400);

@@ -68,7 +68,7 @@ describe('TodoStore Factory Pattern', () => {
       const store2 = createTodoStore();
 
       // Modify store1 filters
-      store1.setProjectFilter(['project1']);
+      store1.setProjectsFilter(['project1']);
 
       // store2 filters should remain unchanged
       expect(store1.filters.projects).toEqual(['project1']);

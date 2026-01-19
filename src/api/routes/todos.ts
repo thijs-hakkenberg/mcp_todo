@@ -1,5 +1,25 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { MCPClient } from '../mcpClient';
+
+// UUID validation regex (works for UUIDv4, UUIDv7, etc.)
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Middleware to validate UUID parameter
+ */
+function validateId(req: Request, res: Response, next: NextFunction): void {
+  const { id } = req.params;
+
+  if (!id || !UUID_REGEX.test(id)) {
+    res.status(400).json({
+      error: 'Invalid ID format',
+      message: 'ID must be a valid UUID'
+    });
+    return;
+  }
+
+  next();
+}
 
 /**
  * Create todo routes with MCP client
@@ -117,7 +137,7 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
   });
 
   // Get single todo
-  router.get('/:id', async (req: Request, res: Response): Promise<void> => {
+  router.get('/:id', validateId, async (req: Request, res: Response): Promise<void> => {
     try {
       const result = await mcpClient.callTool('get_todo', { id: req.params.id });
 
@@ -194,7 +214,7 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
   });
 
   // Update todo
-  router.put('/:id', async (req: Request, res: Response): Promise<void> => {
+  router.put('/:id', validateId, async (req: Request, res: Response): Promise<void> => {
     try {
       // Check If-Match header for optimistic locking
       const ifMatch = req.headers['if-match'];
@@ -244,7 +264,7 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
   });
 
   // Update todo status
-  router.patch('/:id/status', async (req: Request, res: Response): Promise<void> => {
+  router.patch('/:id/status', validateId, async (req: Request, res: Response): Promise<void> => {
     try {
       const validStatuses = ['todo', 'in-progress', 'blocked', 'done'];
 
@@ -272,7 +292,7 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
   });
 
   // Complete todo
-  router.post('/:id/complete', async (req: Request, res: Response): Promise<void> => {
+  router.post('/:id/complete', validateId, async (req: Request, res: Response): Promise<void> => {
     try {
       const result = await mcpClient.callTool('complete_todo', { id: req.params.id });
 
@@ -288,7 +308,7 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
   });
 
   // Add comment
-  router.post('/:id/comment', async (req: Request, res: Response): Promise<void> => {
+  router.post('/:id/comment', validateId, async (req: Request, res: Response): Promise<void> => {
     try {
       if (!req.body.comment) {
         res.status(400).json({ error: 'Comment text is required' });
@@ -312,7 +332,7 @@ export function createTodoRoutes(mcpClient: MCPClient): Router {
   });
 
   // Delete todo
-  router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  router.delete('/:id', validateId, async (req: Request, res: Response): Promise<void> => {
     try {
       // Check If-Match header for optimistic locking
       const ifMatch = req.headers['if-match'];
